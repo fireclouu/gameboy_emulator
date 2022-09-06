@@ -1,12 +1,24 @@
 #include "memorytest.hpp"
 #include "main.hpp"
 
-const char *COLOR_GREEN = "\033[33m";
+const char *COLOR_GREEN = "\033[32m";
+const char *COLOR_RED = "\033[31m";
 const char *COLOR_RESET = "\033[0m";
+
+static inline int print_compare_fancy(char *var_name, int val1, int val2) {
+	int result = 0;
+	if (val1 != val2) {
+		printf("%c >> %sVALUE: 0x%04X   EXPECTED: 0x%04X%s\n", var_name, COLOR_RED, val1, val2, COLOR_RESET);
+		result = 1;
+	} else {
+		printf("%sVALUE: 0x%04X   EXPECTED: 0x%04X%s\n", COLOR_GREEN, val1, val2, COLOR_RESET);
+	}
+	return result;
+}
+
 static inline void debug_memory_test(Z80_Register *param_reg) {
-	printf("%s%s: Memory alloc. and Test mode%s\n", COLOR_GREEN, TITLE, COLOR_RESET);
-	printf("sizeof union reg %lu\n", sizeof(param_reg->register_general));
-const char *COLOR_GREEN = "\033[31m";
+	printf("%s%s: MEMALLOC AND TEST MODE!%s\n", COLOR_GREEN, TITLE, COLOR_RESET);
+	printf("CPU Register struct size: %lu\n", sizeof(param_reg->register_general));
 	// test registers
 	printf("\nGeneral Register memddrs: \n");
 	printf("B  %p\n", (&param_reg->b));
@@ -26,7 +38,7 @@ const char *COLOR_GREEN = "\033[31m";
 	printf("SP %p\n", (&param_reg->sp));
 	printf("PC %p\n", (&param_reg->pc));
 
-	printf("\nTesti direct memaddr set jumping:\n");
+	printf("\nTest direct memaddr set jumping:\n");
 	printf("(writing \"0xF1F2\" to register-pair DE using BC pointer, effectively jumping to one-2 byte in size (expecting DE memaddr))\n");
 	// 1 jump equivalent to 2 byte
 	uint16_t *ptr = &param_reg->bc + (1 * sizeof(uint8_t));
@@ -47,14 +59,14 @@ const char *COLOR_GREEN = "\033[31m";
 	param_reg->pc = 1234;
 	param_reg->sp = 0x5678;
 
-	printf("b should be 0xBB (0x%02X)\n", (param_reg->register_general[1]));
-	printf("c should be 0xCC (0x%02X)\n", (param_reg->register_general[0]));
-	printf("d should be 0xDD (0x%02X)\n", (param_reg->register_general[3]));
-	printf("e should be 0xEE (0x%02X)\n", (param_reg->register_general[2]));
-	printf("h should be 0x22 (0x%02X)\n", (param_reg->register_general[5]));
-	printf("l should be 0x11 (0x%02X)\n", (param_reg->register_general[4]));
-	printf("a should be 0x55 (0x%02X)\n", (param_reg->register_general[7]));
-	printf("f should be 0xFF (0x%02X)\n", (param_reg->register_general[6]));
+	print_compare_fancy("B", 0xBB, param_reg->register_general[1]);
+	print_compare_fancy("C", 0xCC, param_reg->register_general[0]);
+	print_compare_fancy("D", 0xDD, param_reg->register_general[3]);
+	print_compare_fancy("E", 0xEE, param_reg->register_general[2]);
+	print_compare_fancy("H", 0x22, param_reg->register_general[5]);
+	print_compare_fancy("L", 0x11, param_reg->register_general[4]);
+	print_compare_fancy("A", 0x55, param_reg->register_general[7]);
+	print_compare_fancy("F", 0xFF, param_reg->register_general[6]);
 
 	printf("\ntestreading 16bit structs in union\n");
 	param_reg->bc = 0x1122;

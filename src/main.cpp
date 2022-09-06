@@ -5,7 +5,7 @@
 
 #include "main.hpp"
 
-const std::string FILE_PATH = "assets/gb_bios.bin";
+std::string file_path;
 int bit_position, reg_position, value_pre, value_post;
 int rom_size;
 uint8_t gb_memory[0xFFFF] = {};
@@ -77,9 +77,9 @@ void init_registers(Z80_Register *reg_param, int value) {
 		reg_param->de = reg_param->hl = value;
 }
 
-void load_binary(uint8_t *memory, int memory_size, const std::string file_path) {
+void load_binary(uint8_t *memory, int memory_size, const std::string param_file_path) {
 	std::ifstream stream;
-	stream.open(file_path, std::ios::binary | std::ios::in);
+	stream.open(param_file_path, std::ios::binary | std::ios::in);
 	if(stream.is_open()) {
 		while(stream.good()) {
 			stream.read((char *)memory,
@@ -127,16 +127,38 @@ void prefix_cb(int opcode) {
 }
 
 int main(int argc, char **argv) {
-	reg_gb_ptr = &reg_gb;
 	printf("%s\n", (char*)TITLE);
 
+	while ((++argv)[0]) {
+		if (argv[0][0] == '-') {
+			switch (argv[0][1]) {
+				case 'i':
+					file_path = argv[1];
+					break;
+				default:
+					printf("-%c: Unknown option\n", argv[0][1]);
+					return 1;
+			}
+		}
+	}
+
+	if (file_path.empty()) {
+		printf("No file loaded. Exiting...\n");
+		return 1;
+	}
+
+	reg_gb_ptr = &reg_gb;
 	init_registers(reg_gb_ptr, 0);
-	rom_size = read_file_size(FILE_PATH);
-	load_binary(gb_memory, rom_size, FILE_PATH);
-	printf("%s loaded with %d bytes!\n",FILE_PATH.c_str(), rom_size);
+	rom_size = read_file_size(file_path);
+	load_binary(gb_memory, rom_size, file_path);
+
+	printf("%s loaded with %d bytes!\n",file_path.c_str(), rom_size);
+
 	printf("PROGRAM START\n");
+
 	uint8_t pc, opcode, byte_hold;
 	uint16_t *ptr_hold;
+
 	while (true) {
 		print_step(*reg_gb_ptr, gb_memory, "");
 		pc = reg_gb_ptr->pc;
