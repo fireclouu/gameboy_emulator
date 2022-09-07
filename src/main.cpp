@@ -60,6 +60,14 @@ void flag_check_subtract(Z80_Register *reg_param, int value) {
 	reg_param->flag.n = value;
 }
 
+bool is_file_exist(const std::string name) {
+	bool value = false;
+	std::ifstream stream(name, std::ios::binary | std::ios::in);
+	value = stream.is_open();
+	stream.close();
+	return value;
+}
+
 int read_file_size(const std::string name) {
 	int x = 0;
 	std::ifstream stream(name, std::ios::binary | std::ios::in);
@@ -67,6 +75,7 @@ int read_file_size(const std::string name) {
 		stream.seekg(0, std::ios::end);
 		x = stream.tellg();
 	}
+
 	stream.close();
 	return x;
 }
@@ -142,17 +151,23 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	if (file_path.empty()) {
-		printf("No file loaded. Exiting...\n");
+	if (!is_file_exist(file_path)) {
+		printf("%s: No file found in directory.\n", file_path.c_str());
 		return 1;
 	}
 
 	reg_gb_ptr = &reg_gb;
 	init_registers(reg_gb_ptr, 0);
 	rom_size = read_file_size(file_path);
+
+	if (rom_size == 0) {
+		printf("%s: File loaded invalid. Size is 0 bytes!\n", file_path.c_str());
+		return 1;
+	}
+
 	load_binary(gb_memory, rom_size, file_path);
 
-	printf("%s loaded with %d bytes!\n",file_path.c_str(), rom_size);
+	printf("%s: File loaded with %d bytes!\n",file_path.c_str(), rom_size);
 
 	printf("PROGRAM START\n");
 
