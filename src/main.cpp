@@ -8,8 +8,8 @@
 std::string file_path;
 int bit_position, reg_position, value_pre, value_post;
 int rom_size;
-uint8_t gb_memory[0xFFFF] = {};
-
+uint8_t gb_memory[0xFFFF];
+bool running;
 Z80_Register reg_gb;
 Z80_Register *reg_gb_ptr;
 
@@ -33,16 +33,19 @@ const int OP_BYTES[] = {
 };
 
 // mmu
-uint8_t read_byte(uint8_t *memory, int addr) {
+uint8_t read_byte(uint8_t *memory, uint16_t addr) {
 	return memory[addr];
 };
 
-uint16_t read_short(uint8_t *memory, int addr) {
-	return read_byte(memory, addr + 1) << 8 | 
-		read_byte(memory, addr); 
+uint16_t read_short(uint8_t *memory, uint16_t addr) {
+	return (memory[addr + 1] << 8) | memory[addr];
 };
 
 void write_byte(uint8_t *memory, uint16_t addr, uint8_t value) {
+	if (addr < 0x00ff) {
+		printf("\n\nWRITE_ADDR: 0x%04X: invalid write! overwriting ROM FILE!\n", addr);
+		running = false;
+	}
 	memory[addr] = value;
 };
 // mmu end
@@ -91,8 +94,7 @@ void load_binary(uint8_t *memory, int memory_size, const std::string param_file_
 	stream.open(param_file_path, std::ios::binary | std::ios::in);
 	if(stream.is_open()) {
 		while(stream.good()) {
-			stream.read((char *)memory,
-					sizeof(char) * memory_size);
+			stream.read((char *)memory, memory_size);
 		}
 	}
 	stream.close();
@@ -100,13 +102,13 @@ void load_binary(uint8_t *memory, int memory_size, const std::string param_file_
 
 void print_memory(int memory_size) {
 	for (int x = 0; x < memory_size; x++) {
-		printf("%03d: 0x%02X   ", x, gb_memory[x]);
+		printf("%04X: 0x%02X   ", x, gb_memory[x]);
 		if (((x +1) % 4) == 0) printf("\n");
 	}
 }
 
 void print_step(Z80_Register reg_param, uint8_t *memory, std::string prefix) {
-	printf("PC: %04d (%02X)  AF: %04X  BC: %04X  DE: %04X  HL: %04X  SP: %04X  %s\n",
+	printf("PC: %04X (%02X)  AF: %04X  BC: %04X  DE: %04X  HL: %04X  SP: %04X  %s\n",
 			reg_param.pc, memory[reg_param.pc],
 			reg_param.af, reg_param.bc,
 			reg_param.de, reg_param.hl,
@@ -123,6 +125,7 @@ void prefix_cb(int opcode) {
 				reg_position + 1 : reg_position - 1;
 			if (reg_position == 6) {
 				printf("memory hl not implemented yet.\n");
+				running = false;
 				break;
 			}
 			reg_gb_ptr->flag.z = ( (reg_gb_ptr->register_general[reg_position] &
@@ -133,6 +136,12 @@ void prefix_cb(int opcode) {
 		default:
 			printf("0x%02X: Unknown CB opcode!\n", opcode);
 	}
+}
+
+// cpu specific functions
+void cpu_stack_push(Z80_Register *reg_param, uint8_t *memory, uint16_t addr_value) {
+	write_byte(memory, reg_param->sp--, (addr_value & 0xFF00) >> 8);
+	write_byte(memory, reg_param->sp--, (addr_value & 0x00FF));
 }
 
 int main(int argc, char **argv) {
@@ -171,15 +180,33 @@ int main(int argc, char **argv) {
 
 	printf("PROGRAM START\n");
 
-	uint8_t pc, opcode, byte_hold;
+	uint8_t opcode;
+	uint16_t pc, addr_hold;
 	uint16_t *ptr_hold;
-
+	running = true;
 	while (true) {
 		print_step(*reg_gb_ptr, gb_memory, "");
 		pc = reg_gb_ptr->pc;
 		opcode = gb_memory[pc];
 		reg_gb_ptr->pc += OP_BYTES[opcode];
 		switch (opcode) {
+			case 0x00:
+				printf("NOP TRIGGERED!\n");
+				break;
+			case 0xCD:
+				cpu_stack_push(reg_gb_ptr, gb_memory, pc + 3);
+				reg_gb_ptr->pc = read_short(gb_memory, pc + 1);
+				break;
+			// 2 byte addrpairs
+			// LD A, 
+			case 0x0A: // BC
+			case 0x1A: // DE
+				reg_position = (0x30 & opcode) >> 4;
+				ptr_hold = &reg_gb_ptr->bc + reg_position;
+				reg_gb_ptr->a = read_byte(gb_memory, *ptr_hold);
+				break;
+			case 0x7E: // HL
+				reg_gb_ptr->a = read_byte(gb_memory, reg_gb_ptr->hl);
 			// 2byte addresspair loads
 			case 0x01: case 0x11: case 0x21: case 0x31:
 				reg_position = (0x30 & opcode) >> 4;
@@ -217,7 +244,7 @@ int main(int argc, char **argv) {
 				write_byte(gb_memory, reg_gb_ptr->hl--, reg_gb_ptr->a);
 				break;
 			case 0x77: // LD (HL), A
-				write_byte(gb_memory, read_byte(gb_memory, reg_gb_ptr->hl), reg_gb_ptr->a);
+				write_byte(gb_memory, reg_gb_ptr->hl, reg_gb_ptr->a);
 				break;
 			case 0xAF: // XOR A
 				reg_gb_ptr->a ^= reg_gb_ptr->a;
@@ -231,26 +258,25 @@ int main(int argc, char **argv) {
 				reg_gb_ptr->pc++;
 				prefix_cb(opcode);
 				break;
-
 			// LOADS ($ff(a8))
 			case 0xE0: // LDH (a8), A
-			case 0XF0: // LDH A, (a8)
-				byte_hold = 0xFF00 | read_byte(gb_memory, pc + 1);
-				if (opcode == 0xE0) {
-					write_byte(gb_memory, byte_hold, reg_gb_ptr->a);
-				} else if (opcode == 0xF0) {
-					reg_gb_ptr->a = read_byte(gb_memory, byte_hold);
-				}
+				addr_hold = 0xFF00 | read_byte(gb_memory, pc + 1);
+				write_byte(gb_memory, addr_hold, reg_gb_ptr->a);
 				break;
-			case 0xE2: // LD A, (C)
-				reg_gb_ptr->a = read_byte(gb_memory, (0xFF00 | reg_gb_ptr->c) );
+			case 0xE2: // LD (C), A
+				addr_hold = 0xFF00 | reg_gb_ptr->c;
+				write_byte(gb_memory, addr_hold, reg_gb_ptr->a);
+				break;
+			case 0xF0: // LDH A, (a8)
+				addr_hold = 0xFF00 | read_byte(gb_memory, pc + 1);
+				reg_gb_ptr->a = read_byte(gb_memory, addr_hold);
 				break;
 			default:
 				printf("0x%02X: Unknown opcode!\n", opcode);
-				printf("PROGRAM ENDED\n");
 				return 1;
 		}
 	}
+	printf("PROGRAM ENDED\n");
 
 	return 0;
 }
