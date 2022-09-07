@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
 				write_byte(gb_memory, reg_gb_ptr->hl--, reg_gb_ptr->a);
 				break;
 			case 0x77: // LD (HL), A
-				reg_gb_ptr->a = read_byte(gb_memory, reg_gb_ptr->hl);
+				write_byte(gb_memory, read_byte(gb_memory, reg_gb_ptr->hl), reg_gb_ptr->a);
 				break;
 			case 0xAF: // XOR A
 				reg_gb_ptr->a ^= reg_gb_ptr->a;
