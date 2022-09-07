@@ -4,9 +4,9 @@ my restart to making gb emulator.
 Written in C++, using its good advantage of direct memory handling feature
 
 ### Status
-[ ] Opcodes
-[ ] Timings
-[ ] Tests
-[ ] Display
-[ ] Sound
-[ ] Interrupts
+- [ ] Opcodes
+- [ ] Timings
+- [ ] Tests
+- [ ] Display
+- [ ] Sound
+- [ ] Interrupts
