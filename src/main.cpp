@@ -6,7 +6,7 @@
 #include "main.hpp"
 
 std::string file_path;
-int bit_position, reg_position, value_pre, value_post;
+int reg_value, reg_variable, value_pre, value_post;
 int rom_size;
 uint8_t gb_memory[0xFFFF];
 bool running;
@@ -113,23 +113,28 @@ void print_step(Z80_Register reg_param, uint8_t *memory, std::string prefix) {
 			reg_param.af, reg_param.bc,
 			reg_param.de, reg_param.hl,
 			reg_param.sp, prefix.c_str());
+	printf("MEMORY:\n");
+	for (int x = 0; x < 4; x++) {
+		printf("[ 0x%04X: 0x%02X ]\n", reg_param.pc + x, memory[reg_param.pc + x]);
+	}
+	printf("\n");
 }
 
 void prefix_cb(int opcode) {
 	switch(opcode) {
 		// BIT b, r ()
 		case 0x40 ... 0x7F:
-			bit_position = (opcode & 0b00111000) >> 3;
-			reg_position = (opcode & 0b00000111);
-			reg_position = ( (reg_position % 2) == 0) ?
-				reg_position + 1 : reg_position - 1;
-			if (reg_position == 6) {
+			reg_value = (opcode & 0b00111000) >> 3;
+			reg_variable = (opcode & 0b00000111);
+			reg_variable = ( (reg_variable % 2) == 0) ?
+				reg_variable + 1 : reg_variable - 1;
+			if (reg_variable == 6) {
 				printf("memory hl not implemented yet.\n");
 				running = false;
 				break;
 			}
-			reg_gb_ptr->flag.z = ( (reg_gb_ptr->register_general[reg_position] &
-						bit_position) == 0);
+			reg_gb_ptr->flag.z = ( (reg_gb_ptr->register_general[reg_variable] &
+						reg_value) == 0);
 			reg_gb_ptr->flag.n = 0;
 			reg_gb_ptr->flag.h = 1;
 			break;
@@ -201,17 +206,17 @@ int main(int argc, char **argv) {
 			// LD A, 
 			case 0x0A: // BC
 			case 0x1A: // DE
-				reg_position = (0x30 & opcode) >> 4;
-				ptr_hold = &reg_gb_ptr->bc + reg_position;
+				reg_variable = (0x30 & opcode) >> 4;
+				ptr_hold = &reg_gb_ptr->bc + reg_variable;
 				reg_gb_ptr->a = read_byte(gb_memory, *ptr_hold);
 				break;
 			case 0x7E: // HL
 				reg_gb_ptr->a = read_byte(gb_memory, reg_gb_ptr->hl);
 			// 2byte addresspair loads
 			case 0x01: case 0x11: case 0x21: case 0x31:
-				reg_position = (0x30 & opcode) >> 4;
-				if (opcode == 0x31) reg_position++;
-				ptr_hold = &reg_gb_ptr->bc + reg_position;
+				reg_variable = (0x30 & opcode) >> 4;
+				if (opcode == 0x31) reg_variable++;
+				ptr_hold = &reg_gb_ptr->bc + reg_variable;
 				*ptr_hold = read_short(gb_memory, pc + 1);
 				break;
 			// increment jumps z0h-
@@ -221,10 +226,10 @@ int main(int argc, char **argv) {
 					printf("0x%02X: unimplemented!!\n", opcode);
 					break;
 				}
-				reg_position = opcode & 0b00111000;
-				value_pre = reg_gb_ptr->register_general[ reg_position ];
-				reg_gb_ptr->register_general[ reg_position ]++;
-				value_post = reg_gb_ptr->register_general[ reg_position ];
+				reg_variable = opcode & 0b00111000;
+				value_pre = reg_gb_ptr->register_general[ reg_variable ];
+				reg_gb_ptr->register_general[ reg_variable ]++;
+				value_post = reg_gb_ptr->register_general[ reg_variable ];
 				flag_check_zero(reg_gb_ptr, value_post);
 				flag_check_half(reg_gb_ptr, value_pre, value_post);
 				flag_check_subtract(reg_gb_ptr, 0);
