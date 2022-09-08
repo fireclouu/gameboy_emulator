@@ -6,7 +6,7 @@
 #include "main.hpp"
 
 std::string file_path;
-int reg_value, reg_variable, value_pre, value_post;
+uint8_t reg_value, reg_variable, value_pre, value_post;
 int rom_size;
 uint8_t gb_memory[0xFFFF];
 bool running;
@@ -120,21 +120,32 @@ void print_step(Z80_Register reg_param, uint8_t *memory, std::string prefix) {
 	printf("\n");
 }
 
+void dbg_stop_inject() {
+	gb_memory[0] = 0;
+	reg_gb_ptr->pc = 0;
+}
+
 void prefix_cb(int opcode) {
 	switch(opcode) {
+		// RLC b, r
+	/*	case 0x00: case 0x01: case 0x02: case 0x03: case 0x04: case 0x05: case 0x07:
+			reg_variable = (opcode & 0x07);
+			reg_gb_ptr->pc = 0xfffff;
+			dbg_stop_inject();
+			break;*/
 		// BIT b, r ()
-		case 0x40 ... 0x7F:
-			reg_value = (opcode & 0b00111000) >> 3;
-			reg_variable = (opcode & 0b00000111);
-			reg_variable = ( (reg_variable % 2) == 0) ?
-				reg_variable + 1 : reg_variable - 1;
-			if (reg_variable == 6) {
-				printf("memory hl not implemented yet.\n");
-				running = false;
-				break;
-			}
-			reg_gb_ptr->flag.z = ( (reg_gb_ptr->register_general[reg_variable] &
-						reg_value) == 0);
+		case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x47:
+		case 0x48: case 0x49: case 0x4A: case 0x4B: case 0x4C: case 0x4D: case 0x4F:
+		case 0x50: case 0x51: case 0x52: case 0x53: case 0x54: case 0x55: case 0x57:
+		case 0x58: case 0x59: case 0x5A: case 0x5B: case 0x5C: case 0x5D: case 0x5F:
+		case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x67:
+		case 0x68: case 0x69: case 0x6A: case 0x6B: case 0x6C: case 0x6D: case 0x6F:
+		case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x77:
+		case 0x78: case 0x79: case 0x7A: case 0x7B: case 0x7C: case 0x7D: case 0x7F:
+			reg_value = 1 << ((opcode & 0x38) >> 3); // MASK
+			reg_variable = (opcode & 0x07);
+			reg_variable = ( (reg_variable % 2) == 0) ? reg_variable + 1 : reg_variable - 1;
+			reg_gb_ptr->flag.z = ( (reg_gb_ptr->register_general[reg_variable] & reg_value) == 0);
 			reg_gb_ptr->flag.n = 0;
 			reg_gb_ptr->flag.h = 1;
 			break;
@@ -197,7 +208,7 @@ int main(int argc, char **argv) {
 		switch (opcode) {
 			case 0x00:
 				printf("NOP TRIGGERED!\n");
-				break;
+				return 1;
 			case 0xCD:
 				cpu_stack_push(reg_gb_ptr, gb_memory, pc + 3);
 				reg_gb_ptr->pc = read_short(gb_memory, pc + 1);
