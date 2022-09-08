@@ -145,7 +145,7 @@ void prefix_cb(int opcode) {
 			reg_value = 1 << ((opcode & 0x38) >> 3); // MASK
 			reg_variable = (opcode & 0x07);
 			reg_variable = ( (reg_variable % 2) == 0) ? reg_variable + 1 : reg_variable - 1;
-			reg_gb_ptr->flag.z = ( (reg_gb_ptr->register_general[reg_variable] & reg_value) == 0);
+			reg_gb_ptr->flag.z = ( !(reg_gb_ptr->register_general[reg_variable] & reg_value) );
 			reg_gb_ptr->flag.n = 0;
 			reg_gb_ptr->flag.h = 1;
 			break;
