@@ -145,7 +145,7 @@ void prefix_cb(int opcode) {
 			reg_value = 1 << ((opcode & 0x38) >> 3); // MASK
 			reg_variable = (opcode & 0x07);
 			reg_variable = ( (reg_variable % 2) == 0) ? reg_variable + 1 : reg_variable - 1;
-			reg_gb_ptr->flag.z = ( !(reg_gb_ptr->register_general[reg_variable] & reg_value) );
+			reg_gb_ptr->flag.z = ( (reg_gb_ptr->register_general[reg_variable] & reg_value) == 0 );
 			reg_gb_ptr->flag.n = 0;
 			reg_gb_ptr->flag.h = 1;
 			break;
@@ -158,6 +158,11 @@ void prefix_cb(int opcode) {
 void cpu_stack_push(Z80_Register *reg_param, uint8_t *memory, uint16_t addr_value) {
 	write_byte(memory, reg_param->sp--, (addr_value & 0xFF00) >> 8);
 	write_byte(memory, reg_param->sp--, (addr_value & 0x00FF));
+}
+uint16_t cpu_stack_pop(Z80_Register *reg_param, uint8_t *memory) {
+	value_pre = read_byte(memory, ++reg_param->sp);
+	value_post = read_byte(memory, ++reg_param->sp);
+	return ( (value_post) << 8 ) | value_pre;
 }
 
 int main(int argc, char **argv) {
@@ -216,10 +221,10 @@ int main(int argc, char **argv) {
 			// 2 byte addrpairs
 			// LD A, 
 			case 0x0A: // BC
+				reg_gb_ptr->a = read_byte(gb_memory, reg_gb_ptr->bc);
+				break;
 			case 0x1A: // DE
-				reg_variable = (0x30 & opcode) >> 4;
-				ptr_hold = &reg_gb_ptr->bc + reg_variable;
-				reg_gb_ptr->a = read_byte(gb_memory, *ptr_hold);
+				reg_gb_ptr->a = read_byte(gb_memory, reg_gb_ptr->de);
 				break;
 			case 0x7E: // HL
 				reg_gb_ptr->a = read_byte(gb_memory, reg_gb_ptr->hl);
@@ -232,12 +237,8 @@ int main(int argc, char **argv) {
 				break;
 			// increment jumps z0h-
 			case 0x04: case 0x0C: case 0x14: case 0x1C:
-			case 0x24: case 0x2C: case 0x34: case 0x3C:
-				if (opcode == 0x34) {
-					printf("0x%02X: unimplemented!!\n", opcode);
-					break;
-				}
-				reg_variable = opcode & 0b00111000;
+			case 0x24: case 0x2C: case 0x3C:
+				reg_variable = opcode & 0x38;
 				value_pre = reg_gb_ptr->register_general[ reg_variable ];
 				reg_gb_ptr->register_general[ reg_variable ]++;
 				value_post = reg_gb_ptr->register_general[ reg_variable ];
