@@ -9,7 +9,7 @@ std::string file_path;
 uint8_t reg_value, reg_variable, value_pre, value_post;
 int rom_size;
 uint8_t gb_memory[0xFFFF];
-bool running;
+bool program_stop;
 Z80_Register reg_gb;
 Z80_Register *reg_gb_ptr;
 
@@ -44,7 +44,7 @@ uint16_t read_short(uint8_t *memory, uint16_t addr) {
 void write_byte(uint8_t *memory, uint16_t addr, uint8_t value) {
 	if (addr < 0x00ff) {
 		printf("\n\nWRITE_ADDR: 0x%04X: invalid write! overwriting ROM FILE!\n", addr);
-		running = false;
+		program_stop = true;
 	}
 	memory[addr] = value;
 };
@@ -151,6 +151,7 @@ void prefix_cb(int opcode) {
 			break;
 		default:
 			printf("0x%02X: Unknown CB opcode!\n", opcode);
+			program_stop = true;
 	}
 }
 
@@ -204,13 +205,39 @@ int main(int argc, char **argv) {
 	uint8_t opcode;
 	uint16_t pc, addr_hold;
 	uint16_t *ptr_hold;
-	running = true;
-	while (true) {
+	program_stop = false;
+	while (!program_stop) {
 		print_step(*reg_gb_ptr, gb_memory, "");
 		pc = reg_gb_ptr->pc;
 		opcode = gb_memory[pc];
 		reg_gb_ptr->pc += OP_BYTES[opcode];
 		switch (opcode) {
+			// LD regs
+			case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x47:
+			case 0x48: case 0x49: case 0x4A: case 0x4B: case 0x4C: case 0x4D: case 0x4F:
+			case 0x50: case 0x51: case 0x52: case 0x53: case 0x54: case 0x55: case 0x57:
+			case 0x58: case 0x59: case 0x5A: case 0x5B: case 0x5C: case 0x5D: case 0x5F:
+			case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x67:
+			case 0x68: case 0x69: case 0x6A: case 0x6B: case 0x6C: case 0x6D: case 0x6F:
+			case 0x78: case 0x79: case 0x7A: case 0x7B: case 0x7C: case 0x7D: case 0x7F:
+				reg_value = (opcode & 0x07);
+				reg_value = ( (reg_value % 2) == 0) ? reg_value + 1 : reg_value - 1;
+				reg_variable = (opcode & 0x38) >> 3;
+				reg_variable = ( (reg_variable % 2) == 0) ? reg_variable + 1 : reg_variable - 1;
+				reg_gb_ptr->register_general[reg_variable] =  reg_gb_ptr->register_general[reg_value];
+				break;
+			// LD n, d8
+			case 0x06: case 0x0E: case 0x16: case 0x1E: case 0x26: case 0x2E: case 0x3E:
+				reg_variable = (opcode & 0x38) >> 3;
+				reg_variable = ( (reg_variable % 2) == 0) ? reg_variable + 1 : reg_variable - 1;
+				reg_gb_ptr->register_general[reg_variable] =  read_byte(gb_memory, pc + 1);
+				break;
+			// PUSH
+			case 0xC5: case 0xD5: case 0xE5: case 0xF5: 
+				reg_variable = (0x3 & opcode);
+				ptr_hold = &reg_gb_ptr->bc + reg_variable;
+				cpu_stack_push(reg_gb_ptr, gb_memory, *ptr_hold);
+				break;
 			case 0x00:
 				printf("NOP TRIGGERED!\n");
 				return 1;
@@ -246,16 +273,10 @@ int main(int argc, char **argv) {
 				flag_check_half(reg_gb_ptr, value_pre, value_post);
 				flag_check_subtract(reg_gb_ptr, 0);
 				break;
-			case 0x0E: // LD C, d8
-				reg_gb_ptr->c = read_byte(gb_memory, pc + 1);
-				break;
 			case 0x20: // JMP NZ, signed d8 + pc
 				if (reg_gb_ptr->flag.z == 0) {
 					reg_gb_ptr->pc += int8_t(read_byte(gb_memory, pc + 1));
 				}
-				break;
-			case 0x3E: // LD A, d8
-				reg_gb_ptr->a = read_byte(gb_memory, pc + 1);
 				break;
 			case 0x32: // LD (HL-), A
 				write_byte(gb_memory, reg_gb_ptr->hl--, reg_gb_ptr->a);
