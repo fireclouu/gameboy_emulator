@@ -1,7 +1,7 @@
 #pragma once // not caring with mutliple clangcomp version
 #include <stdint.h>
 
-#define TITLE "Z80BOY"
+#define TITLE "GBEMU_V2"
 
 const int FLAG_POS_ZERO        = 7;
 const int FLAG_POS_SUBTRACT    = 6;

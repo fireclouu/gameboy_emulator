@@ -116,7 +116,6 @@ void build_ptr_op_reg_u16(Z80_Register *param_reg, uint16_t *param_ptr_op_reg_u1
 	param_ptr_op_reg_u16[1] = &param_reg->de; // 1
 	param_ptr_op_reg_u16[2] = &param_reg->hl; // 2
 	param_ptr_op_reg_u16[3] = &param_reg->sp; // 3
-
 }
 void load_binary(uint8_t *memory, int memory_size, const std::string param_file_path) {
 	std::ifstream stream;

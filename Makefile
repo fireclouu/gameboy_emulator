@@ -1,7 +1,7 @@
 CC := g++
 CFLAGS := -Wall -g
-EXE := z80boy
-TEST_EXE := z80boy_memtest
+EXE := gbemuv2
+TEST_EXE := gbemuv2_memtest
 SRC_DIR := src
 TEST_FILES := $(SRC_DIR)/memorytest.cpp
 SRC_FILES := $(filter-out $(TEST_FILES), $(wildcard $(SRC_DIR)/*.cpp))
