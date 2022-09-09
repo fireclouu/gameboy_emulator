@@ -12,7 +12,7 @@ uint8_t gb_memory[0xFFFF];
 uint8_t *ptr_op_reg_u8[8];
 uint16_t *ptr_op_reg_u16[4];
 bool program_stop;
-Z80_Register reg_gb;
+Z80_Register gb_register;
 Z80_Register *ptr_gb_reg;
 
 const int OP_BYTES[] = {
@@ -66,8 +66,12 @@ void flag_check_zero(Z80_Register *param_reg, int value) {
 	param_reg->flag.z = (value == 0);
 }
 
-void flag_check_half(Z80_Register *param_reg, int value_before, int value_after) {
-	param_reg->flag.h = ( (value_before & 0xF) + (value_after & 0xF) & 0x10);
+void flag_check_half(Z80_Register *param_reg, int value_before, int value_after, bool subtraction) {
+	if (subtraction) {
+		param_reg->flag.h = uint8_t((value_before & 0xF) - (value_after & 0xF)) > value_before ? 1 : 0;
+	} else {
+		param_reg->flag.h = ( ((value_before & 0xF) + (value_after & 0xF)) & 0x10) ? 1 : 0;
+	}
 }
 
 void flag_check_subtract(Z80_Register *param_reg, int value) {
@@ -141,9 +145,9 @@ void print_step(Z80_Register param_reg, uint8_t *memory, std::string prefix) {
 			param_reg.af, param_reg.bc,
 			param_reg.de, param_reg.hl,
 			param_reg.sp, prefix.c_str());
-	printf("MEMORY:\n");
+	printf("MEMORY and STACK:\n");
 	for (int x = 0; x < 4; x++) {
-		printf("[ 0x%04X: 0x%02X ]\n", param_reg.pc + x, memory[param_reg.pc + x]);
+		printf("[ 0x%04X: 0x%02X ]    [ 0x%04X: 0x%02X ]\n", param_reg.pc + x, memory[param_reg.pc + x], param_reg.sp + x, memory[param_reg.sp + x]);
 	}
 	printf("\n");
 }
@@ -183,13 +187,13 @@ void prefix_cb(int opcode) {
 
 // cpu specific functions
 void cpu_stack_push(Z80_Register *param_reg, uint8_t *memory, uint16_t addr_value) {
-	write_byte(memory, param_reg->sp--, (addr_value & 0xFF00) >> 8);
 	write_byte(memory, param_reg->sp--, (addr_value & 0x00FF));
+	write_byte(memory, param_reg->sp--, (addr_value & 0xFF00) >> 8);
 }
 uint16_t cpu_stack_pop(Z80_Register *param_reg, uint8_t *memory) {
 	value_pre = read_byte(memory, ++param_reg->sp);
 	value_post = read_byte(memory, ++param_reg->sp);
-	return ( (value_post) << 8 ) | value_pre;
+	return ( (value_pre) << 8 ) | (value_post);
 }
 
 int main(int argc, char **argv) {
@@ -217,7 +221,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	ptr_gb_reg = &reg_gb;
+	ptr_gb_reg = &gb_register;
 	init_registers(ptr_gb_reg, 0);
 	build_ptr_op_reg_u8(ptr_gb_reg, ptr_op_reg_u8);
 	build_ptr_op_reg_u16(ptr_gb_reg, ptr_op_reg_u16);
@@ -246,6 +250,16 @@ int main(int argc, char **argv) {
 		ptr_gb_reg->pc += OP_BYTES[opcode];
 
 		switch (opcode) {
+			// SHIFTS
+			case 0x17: // RLA
+				hold_byte = (ptr_gb_reg->a & 0x80);
+				ptr_gb_reg->a = (ptr_gb_reg->a << 1) + ptr_gb_reg->flag.c;
+				ptr_gb_reg->flag.h = 0;
+				ptr_gb_reg->flag.n = 0;
+				ptr_gb_reg->flag.c = hold_byte;
+				flag_check_zero(ptr_gb_reg, ptr_gb_reg->a);
+				break;
+
 			// LD (reg, no HL), (reg, no HL)
 			case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x47:
 			case 0x48: case 0x49: case 0x4A: case 0x4B: case 0x4C: case 0x4D: case 0x4F:
@@ -284,12 +298,42 @@ int main(int argc, char **argv) {
 
 
 
-			// PUSH
-			case 0xC5: case 0xD5: case 0xE5: case 0xF5: 
-				reg_variable = (0x3 & opcode);
+			// STACK
+			case 0xC5: case 0xD5: case 0xE5: case 0xF5: // PUSH
+				reg_variable = (0x30 & opcode) >> 4;
 				hold_ptr_u16 = &ptr_gb_reg->bc + reg_variable;
 				cpu_stack_push(ptr_gb_reg, gb_memory, *hold_ptr_u16);
 				break;
+			case 0xC1: case 0xD1: case 0xE1: case 0xF1: // POP
+				reg_variable = (0x30 & opcode) >> 4;
+				hold_ptr_u16 = &ptr_gb_reg->bc + reg_variable;
+				*hold_ptr_u16 = cpu_stack_pop(ptr_gb_reg, gb_memory);
+				break;
+
+			// ALU
+			// INC reg
+			case 0x04: case 0x0C: case 0x14: case 0x1C:
+			case 0x24: case 0x2C: case 0x3C:
+				reg_variable = opcode & 0x38 >> 3;
+				value_pre = *ptr_op_reg_u8[reg_variable]++;
+				value_post = *ptr_op_reg_u8[reg_variable];
+				flag_check_zero(ptr_gb_reg, value_post);
+				flag_check_half(ptr_gb_reg, value_pre, 1, false);
+				ptr_gb_reg->flag.n = 0;
+				break;
+			// DEC reg
+			case 0x05: case 0x0D:
+			case 0x15: case 0x1D:
+			case 0x25: case 0x2D:
+			case 0x3D:
+				reg_variable = (0x30 & opcode) >> 4;
+				value_pre = *ptr_op_reg_u8[reg_variable]--;
+				value_post = *ptr_op_reg_u8[reg_variable];
+				flag_check_zero(ptr_gb_reg, value_post);
+				flag_check_half(ptr_gb_reg, value_pre, 1, true);
+				ptr_gb_reg->flag.n = 1;
+				break;
+
 			case 0x00: // NOP
 				break;
 			case 0xCD:
@@ -308,16 +352,6 @@ int main(int argc, char **argv) {
 			case 0x01: case 0x11: case 0x21: case 0x31:
 				reg_variable = (0x30 & opcode) >> 4;
 				*ptr_op_reg_u16[reg_variable] = read_short(gb_memory, pc + 1);
-				break;
-			// INC reg
-			case 0x04: case 0x0C: case 0x14: case 0x1C:
-			case 0x24: case 0x2C: case 0x3C:
-				reg_variable = opcode & 0x38 >> 3;
-				value_pre = *ptr_op_reg_u8[reg_variable]++;
-				value_post = *ptr_op_reg_u8[reg_variable];
-				flag_check_zero(ptr_gb_reg, value_post);
-				flag_check_half(ptr_gb_reg, value_pre, value_post);
-				flag_check_subtract(ptr_gb_reg, 0);
 				break;
 			case 0x20: // JMP NZ, signed d8 + pc
 				if (ptr_gb_reg->flag.z == 0) {
