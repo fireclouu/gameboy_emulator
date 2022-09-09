@@ -9,7 +9,7 @@ SRC_FILES := $(filter-out $(TEST_FILES), $(wildcard $(SRC_DIR)/*.cpp))
 $(EXE): $(SRC_FILES)
 	$(CC) $(CFLAGS) -o $@ $^
 
-memtest: $(TEST_FILES)
+test: $(TEST_FILES)
 	$(CC) $(CFLAGS) -o $(TEST_EXE) $(TEST_FILES) && ./$(TEST_EXE)
 
 .PHONY: clean
