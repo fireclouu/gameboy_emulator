@@ -9,5 +9,5 @@ assets
 src/todos
 
 # binaries
-z80boy
-z80boy_memtest
+gbemuv2
+gbemuv2_memtest
