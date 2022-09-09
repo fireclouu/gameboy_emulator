@@ -1,4 +1,4 @@
-# z80boy
+# gbemu_v2
 my restart to making gb emulator.
 ### Overview
 Written in C++, using its good advantage of direct memory handling feature
