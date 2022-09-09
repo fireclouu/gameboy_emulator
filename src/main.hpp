@@ -8,10 +8,10 @@ const int FLAG_POS_SUBTRACT    = 6;
 const int FLAG_POS_HALF_CARRY  = 5;
 const int FLAG_POS_CARRY       = 4;
 
-const int FLAG_MASK_ZERO       = 0b10000000;
-const int FLAG_MASK_SUBTRACT   = 0b01000000;
-const int FLAG_MASK_HALF_CARRY = 0b00100000;
-const int FLAG_MASK_CARRY      = 0b00010000;
+const int FLAG_MASK_ZERO       = 0x80;
+const int FLAG_MASK_SUBTRACT   = 0x40;
+const int FLAG_MASK_HALF_CARRY = 0x20;
+const int FLAG_MASK_CARRY      = 0x10;
 
 struct Z80_Register {
 	union {

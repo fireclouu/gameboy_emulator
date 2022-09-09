@@ -295,8 +295,29 @@ int main(int argc, char **argv) {
 				hold_byte = read_byte(gb_memory, pc + 1);
 				write_byte(gb_memory, ptr_gb_reg->hl, hold_byte);
 				break;
-
-
+			// LD rr, d8
+			case 0x01: case 0x11: case 0x21: case 0x31:
+				reg_variable = (0x30 & opcode) >> 4;
+				*ptr_op_reg_u16[reg_variable] = read_short(gb_memory, pc + 1);
+				break;
+			// LD A,rr
+			case 0x0A: case 0x1A:
+				reg_variable = (opcode & 0x30) >> 4;
+				ptr_gb_reg->a = read_byte(gb_memory, *ptr_op_reg_u16[reg_variable]);
+				break;
+			// LD (rr), A
+			case 0x02: case 0x12:
+				reg_variable = (opcode & 0x30) >> 4;
+				write_byte(gb_memory, *ptr_op_reg_u16[reg_variable], ptr_gb_reg->a);
+				break;
+			// LD (HL+), A
+			case 0x22:
+				write_byte(gb_memory, ptr_gb_reg->hl++, ptr_gb_reg->a);
+				break;
+			case 0x32:
+			// LD (HL-), A
+				write_byte(gb_memory, ptr_gb_reg->hl--, ptr_gb_reg->a);
+				break;
 
 			// STACK
 			case 0xC5: case 0xD5: case 0xE5: case 0xF5: // PUSH
@@ -340,30 +361,14 @@ int main(int argc, char **argv) {
 				cpu_stack_push(ptr_gb_reg, gb_memory, pc + 3);
 				ptr_gb_reg->pc = read_short(gb_memory, pc + 1);
 				break;
-			// 2 byte addrpairs
-			// LD A, 
-			case 0x0A: // BC
-				ptr_gb_reg->a = read_byte(gb_memory, ptr_gb_reg->bc);
-				break;
-			case 0x1A: // DE
-				ptr_gb_reg->a = read_byte(gb_memory, ptr_gb_reg->de);
-				break;
-			// LD rr, d8
-			case 0x01: case 0x11: case 0x21: case 0x31:
-				reg_variable = (0x30 & opcode) >> 4;
-				*ptr_op_reg_u16[reg_variable] = read_short(gb_memory, pc + 1);
-				break;
 			case 0x20: // JMP NZ, signed d8 + pc
 				if (ptr_gb_reg->flag.z == 0) {
 					ptr_gb_reg->pc += int8_t(read_byte(gb_memory, pc + 1));
 				}
 				break;
-			case 0x32: // LD (HL-), A
-				write_byte(gb_memory, ptr_gb_reg->hl--, ptr_gb_reg->a);
-				break;
 			case 0xAF: // XOR A
 				ptr_gb_reg->a ^= ptr_gb_reg->a;
-				ptr_gb_reg->f = (ptr_gb_reg->a == 0) << FLAG_POS_ZERO;
+				flag_check_zero(ptr_gb_reg, ptr_gb_reg->a);
 				ptr_gb_reg->f &= FLAG_MASK_ZERO;
 				break;
 			case 0xCB: // PREFIX CB
