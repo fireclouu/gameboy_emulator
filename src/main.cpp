@@ -9,7 +9,8 @@ std::string file_path;
 int rom_size;
 uint8_t reg_value, reg_variable, value_pre, value_post;
 uint8_t gb_memory[0xFFFF];
-uint8_t *ptr_op_reg[8];
+uint8_t *ptr_op_reg_u8[8];
+uint16_t *ptr_op_reg_u16[4];
 bool program_stop;
 Z80_Register reg_gb;
 Z80_Register *ptr_gb_reg;
@@ -99,17 +100,24 @@ void init_registers(Z80_Register *param_reg, int value) {
 		param_reg->de = param_reg->hl = value;
 }
 
-void build_ptr_op_reg(Z80_Register *param_reg, uint8_t *param_ptr_op_reg[8]) {
-	param_ptr_op_reg[0] = &param_reg->b; // 0
-	param_ptr_op_reg[1] = &param_reg->c; // 1
-	param_ptr_op_reg[2] = &param_reg->d; // 2
-	param_ptr_op_reg[3] = &param_reg->e; // 3
-	param_ptr_op_reg[4] = &param_reg->h; // 4
-	param_ptr_op_reg[5] = &param_reg->l; // 5
-	param_ptr_op_reg[6] = &gb_memory[param_reg->hl]; // 6
-	param_ptr_op_reg[7] = &param_reg->a; // 7
+void build_ptr_op_reg_u8(Z80_Register *param_reg, uint8_t *param_ptr_op_reg_u8[8]) {
+	param_ptr_op_reg_u8[0] = &param_reg->b; // 0
+	param_ptr_op_reg_u8[1] = &param_reg->c; // 1
+	param_ptr_op_reg_u8[2] = &param_reg->d; // 2
+	param_ptr_op_reg_u8[3] = &param_reg->e; // 3
+	param_ptr_op_reg_u8[4] = &param_reg->h; // 4
+	param_ptr_op_reg_u8[5] = &param_reg->l; // 5
+	param_ptr_op_reg_u8[6] = &gb_memory[param_reg->hl]; // 6
+	param_ptr_op_reg_u8[7] = &param_reg->a; // 7
 }
 
+void build_ptr_op_reg_u16(Z80_Register *param_reg, uint16_t *param_ptr_op_reg_u16[4]) {
+	param_ptr_op_reg_u16[0] = &param_reg->bc; // 0
+	param_ptr_op_reg_u16[1] = &param_reg->de; // 1
+	param_ptr_op_reg_u16[2] = &param_reg->hl; // 2
+	param_ptr_op_reg_u16[3] = &param_reg->sp; // 3
+
+}
 void load_binary(uint8_t *memory, int memory_size, const std::string param_file_path) {
 	std::ifstream stream;
 	stream.open(param_file_path, std::ios::binary | std::ios::in);
@@ -144,7 +152,7 @@ void print_step(Z80_Register param_reg, uint8_t *memory, std::string prefix) {
 void prefix_cb(int opcode) {
 	reg_variable = (opcode & 0x07);
 	uint8_t hold_bit;
-	uint8_t *hold_ptr_u8 = ptr_op_reg[reg_variable];
+	uint8_t *hold_ptr_u8 = ptr_op_reg_u8[reg_variable];
 	print_step(*ptr_gb_reg, gb_memory, "");
 	switch(opcode) {
 		// RLC b, r
@@ -213,7 +221,8 @@ int main(int argc, char **argv) {
 
 	ptr_gb_reg = &reg_gb;
 	init_registers(ptr_gb_reg, 0);
-	build_ptr_op_reg(ptr_gb_reg, ptr_op_reg);
+	build_ptr_op_reg_u8(ptr_gb_reg, ptr_op_reg_u8);
+	build_ptr_op_reg_u16(ptr_gb_reg, ptr_op_reg_u16);
 	rom_size = read_file_size(file_path);
 
 	if (rom_size == 0) {
@@ -240,13 +249,16 @@ int main(int argc, char **argv) {
 
 		switch (opcode) {
 			// LD (reg, no HL), (reg, no HL)
-			case 0x40 ... 0x45: case 0x47 ... 0x4D: case 0x4F:
-			case 0x50 ... 0x55: case 0x57 ... 0x5D: case 0x5F:
-			case 0x60 ... 0x65: case 0x67 ... 0x6D: case 0x6F:
-			case 0x78 ... 0x7D: case 0x7F:
-				reg_value = (opcode & 0x07);
+			case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x47: 
+			case 0x48: case 0x49: case 0x4A: case 0x4B: case 0x4C: case 0x4D: case 0x4F:
+			case 0x50: case 0x51: case 0x52: case 0x53: case 0x54: case 0x55: case 0x57: 
+			case 0x58: case 0x59: case 0x5A: case 0x5B: case 0x5C: case 0x5D: case 0x5F:
+			case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x67: 
+			case 0x68: case 0x69: case 0x6A: case 0x6B: case 0x6C: case 0x6D: case 0x6F:
+			case 0x78: case 0x79: case 0x7A: case 0x7B: case 0x7C: case 0x7D: case 0x7F:
+				reg_value = (opcode & 7);
 				reg_variable = (opcode & 0x38) >> 3;
-				*ptr_op_reg[reg_variable] = *ptr_op_reg[reg_value];
+				*ptr_op_reg_u8[reg_variable] = *ptr_op_reg_u8[reg_value];
 				break;
 			// LD reg, (HL)
 			case 0x46: case 0x4E:
@@ -254,17 +266,17 @@ int main(int argc, char **argv) {
 			case 0x66: case 0x6E:
 			case 0x76: case 0x7E:
 				reg_variable = (opcode & 0x38) >> 3;
-				*ptr_op_reg[reg_variable] = read_byte(gb_memory, ptr_gb_reg->hl);
+				*ptr_op_reg_u8[reg_variable] = read_byte(gb_memory, ptr_gb_reg->hl);
 				break;
 			// LD (HL), reg
 			case 0x70: case 0x75: case 0x77:
 				reg_value = (opcode & 0x07);
-				write_byte(gb_memory, ptr_gb_reg->hl, *ptr_op_reg[reg_value]);
+				write_byte(gb_memory, ptr_gb_reg->hl, *ptr_op_reg_u8[reg_value]);
 				break;
 			// LD (reg, no HL), d8
 			case 0x06: case 0x0E: case 0x16: case 0x1E: case 0x26: case 0x2E: case 0x3E:
 				reg_variable = (opcode & 0x38) >> 3;
-				*ptr_op_reg[reg_variable] =  read_byte(gb_memory, pc + 1);
+				*ptr_op_reg_u8[reg_variable] =  read_byte(gb_memory, pc + 1);
 				break;
 			// LD (HL), d8
 			case 0x36:
@@ -280,9 +292,8 @@ int main(int argc, char **argv) {
 				hold_ptr_u16 = &ptr_gb_reg->bc + reg_variable;
 				cpu_stack_push(ptr_gb_reg, gb_memory, *hold_ptr_u16);
 				break;
-			case 0x00:
-				printf("NOP TRIGGERED!\n");
-				return 1;
+			case 0x00: // NOP
+				break;
 			case 0xCD:
 				cpu_stack_push(ptr_gb_reg, gb_memory, pc + 3);
 				ptr_gb_reg->pc = read_short(gb_memory, pc + 1);
@@ -295,19 +306,17 @@ int main(int argc, char **argv) {
 			case 0x1A: // DE
 				ptr_gb_reg->a = read_byte(gb_memory, ptr_gb_reg->de);
 				break;
-			// 2byte addresspair loads
+			// LD rr, d8
 			case 0x01: case 0x11: case 0x21: case 0x31:
 				reg_variable = (0x30 & opcode) >> 4;
-				if (opcode == 0x31) reg_variable++;
-				hold_ptr_u16 = &ptr_gb_reg->bc + reg_variable;
-				*hold_ptr_u16 = read_short(gb_memory, pc + 1);
+				*ptr_op_reg_u16[reg_variable] = read_short(gb_memory, pc + 1);
 				break;
-			// increment jumps z0h-
+			// INC reg
 			case 0x04: case 0x0C: case 0x14: case 0x1C:
 			case 0x24: case 0x2C: case 0x3C:
-				reg_variable = opcode & 0x38;
-				value_pre = *ptr_op_reg[reg_variable]++;
-				value_post = *ptr_op_reg[reg_variable];
+				reg_variable = opcode & 0x38 >> 3;
+				value_pre = *ptr_op_reg_u8[reg_variable]++;
+				value_post = *ptr_op_reg_u8[reg_variable];
 				flag_check_zero(ptr_gb_reg, value_post);
 				flag_check_half(ptr_gb_reg, value_pre, value_post);
 				flag_check_subtract(ptr_gb_reg, 0);
@@ -325,7 +334,7 @@ int main(int argc, char **argv) {
 				ptr_gb_reg->f = (ptr_gb_reg->a == 0) << FLAG_POS_ZERO;
 				ptr_gb_reg->f &= FLAG_MASK_ZERO;
 				break;
-			case 0xCB:
+			case 0xCB: // PREFIX CB
 				print_step(*ptr_gb_reg, gb_memory, "(CB)");
 				pc = ptr_gb_reg->pc;
 				opcode = gb_memory[pc];
