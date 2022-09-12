@@ -5,7 +5,7 @@
 
 #include "main.hpp"
 
-std::string file_path;
+std::string FILE_PATH;
 int rom_size;
 uint8_t reg_value, reg_variable, value_pre, value_post;
 uint8_t gb_memory[0xFFFF];
@@ -78,32 +78,6 @@ void flag_do_h(Z80_Register *param_reg, int value_left, int value_right, bool su
 	}
 }
 
-bool is_file_exist(const std::string name) {
-	bool value = false;
-	std::ifstream stream(name, std::ios::binary | std::ios::in);
-	value = stream.is_open();
-	stream.close();
-	return value;
-}
-
-int read_file_size(const std::string name) {
-	int x = 0;
-	std::ifstream stream(name, std::ios::binary | std::ios::in);
-	if (stream.is_open()) {
-		stream.seekg(0, std::ios::end);
-		x = stream.tellg();
-	}
-
-	stream.close();
-	return x;
-}
-
-void init_registers(Z80_Register *param_reg, int value) {
-	param_reg->pc = param_reg->sp =
-		param_reg->af = param_reg->bc =
-		param_reg->de = param_reg->hl = value;
-}
-
 void build_ptr_op_reg_u8(Z80_Register *param_reg, uint8_t *param_ptr_op_reg_u8[8]) {
 	param_ptr_op_reg_u8[0] = &param_reg->b; // 0
 	param_ptr_op_reg_u8[1] = &param_reg->c; // 1
@@ -120,16 +94,6 @@ void build_ptr_op_reg_u16(Z80_Register *param_reg, uint16_t *param_ptr_op_reg_u1
 	param_ptr_op_reg_u16[1] = &param_reg->de; // 1
 	param_ptr_op_reg_u16[2] = &param_reg->hl; // 2
 	param_ptr_op_reg_u16[3] = &param_reg->sp; // 3
-}
-void load_binary(uint8_t *memory, int memory_size, const std::string param_file_path) {
-	std::ifstream stream;
-	stream.open(param_file_path, std::ios::binary | std::ios::in);
-	if(stream.is_open()) {
-		while(stream.good()) {
-			stream.read((char *)memory, memory_size);
-		}
-	}
-	stream.close();
 }
 
 void print_memory(uint8_t *param_memory, int param_mem_size) {
@@ -210,45 +174,95 @@ void cpu_conditon_jump_signed(Z80_Register *param_reg, uint8_t param_flag, uint8
 	}
 }
 
-int main(int argc, char **argv) {
-	printf("%s\n", (char*)TITLE);
-
-	while ((++argv)[0]) {
-		if (argv[0][0] == '-') {
-			switch (argv[0][1]) {
+// binary specific function
+int handle_user_argument(int param_argc, char **param_argv) {
+	int exit_code = 0;
+	while ((++param_argv)[0]) {
+		if (param_argv[0][0] == '-') {
+			switch (param_argv[0][1]) {
 				case 'i':
-					if (!(argv[1] == nullptr)) file_path = argv[1];
-					if (file_path.empty()) {
+					if ((param_argv[1] == nullptr) || std::string(param_argv[1]).empty()) {
 						printf("error: provide file path\n");
-						return 1;
+						exit_code = 1;
+					} else {
+						FILE_PATH = param_argv[1];
 					}
 					break;
 				default:
-					printf("-%c: Unknown option\n", argv[0][1]);
-					return 1;
+					printf("-%c: Unknown option\n", param_argv[0][1]);
+					exit_code = 1;
 			}
 		}
 	}
+	return exit_code;
+}
 
-	if (!is_file_exist(file_path)) {
-		printf("%s: No file found in directory.\n", file_path.c_str());
-		return 1;
+void load_binary(uint8_t *memory, int memory_size, const std::string param_file_path) {
+	std::ifstream stream;
+	stream.open(param_file_path, std::ios::binary | std::ios::in);
+	if(stream.is_open()) {
+		while(stream.good()) {
+			stream.read((char *)memory, memory_size);
+		}
 	}
+	stream.close();
+}
+
+bool is_file_exist(const std::string name) {
+	bool value = false;
+	std::ifstream stream(name, std::ios::binary | std::ios::in);
+	value = stream.is_open();
+	stream.close();
+	return value;
+}
+
+int read_file_size(const std::string name) {
+	int x = 0;
+	std::ifstream stream(name, std::ios::binary | std::ios::in);
+	if (stream.is_open()) {
+		stream.seekg(0, std::ios::end);
+		x = stream.tellg();
+	}
+
+	stream.close();
+	return x;
+}
+
+int file_load(uint8_t *param_memory, std::string param_file_path) {
+	int exit_code = 0;
+
+	if (is_file_exist(param_file_path)) {
+		rom_size = read_file_size(param_file_path);
+		if (rom_size == 0) {
+			printf("%s: File invalid! 0 bytes.\n", param_file_path.c_str());
+			exit_code = 1;
+		}
+	} else {
+		printf("%s: No file found in directory.\n", param_file_path.c_str());
+		exit_code = 1;
+	}
+
+	return exit_code;
+}
+
+// init
+int init() {
+	int exit_code = 0;
 
 	ptr_gb_reg = &gb_register;
-	init_registers(ptr_gb_reg, 0);
 	build_ptr_op_reg_u8(ptr_gb_reg, ptr_op_reg_u8);
 	build_ptr_op_reg_u16(ptr_gb_reg, ptr_op_reg_u16);
+	load_binary(gb_memory, rom_size, FILE_PATH);
+	printf("%s: File loaded with %d bytes!\n",FILE_PATH.c_str(), rom_size);
+	return exit_code;
+}
 
-	rom_size = read_file_size(file_path);
-	if (rom_size == 0) {
-		printf("%s: File loaded invalid. Size is 0 bytes!\n", file_path.c_str());
-		return 1;
-	}
+int main(int argc, char **argv) {
+	printf("%s\n", (char*)TITLE);
+	if( handle_user_argument(argc, argv) ||
+			file_load(gb_memory, FILE_PATH)  ||
+			init() ) return 1;
 
-	load_binary(gb_memory, rom_size, file_path);
-
-	printf("%s: File loaded with %d bytes!\n",file_path.c_str(), rom_size);
 
 	printf("PROGRAM START\n");
 
