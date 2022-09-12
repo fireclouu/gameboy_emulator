@@ -1,7 +1,7 @@
-#pragma once // not caring with mutliple clangcomp version
-#include <stdint.h>
-
+#ifndef MAIN_HPP
+#define MAIN_HPP
 #define TITLE "GBEMU_V2"
+#include <stdint.h>
 
 const int FLAG_POS_ZERO        = 7;
 const int FLAG_POS_SUBTRACT    = 6;
@@ -57,3 +57,4 @@ struct Z80_Register {
 	uint16_t pc;
 };
 
+#endif // MAIN_HPP
