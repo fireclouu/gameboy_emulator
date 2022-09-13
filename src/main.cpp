@@ -278,15 +278,17 @@ int main(int argc, char **argv) {
 		ptr_gb_reg->pc += OP_BYTES[opcode];
 
 		switch (opcode) {
-			// SHIFTS
-			case 0x07: // RLCA
+			// ROTATES AND SHIFTS
+			// RLCA
+			case 0x07:
 				hold_byte = ( (ptr_gb_reg->a & 0x80) >> 7);
 				ptr_gb_reg->a = (ptr_gb_reg->a << 1) + hold_byte;
 				flag_do_z(ptr_gb_reg, ptr_gb_reg->a);
 				ptr_gb_reg->flag.h = ptr_gb_reg->flag.n = 0;
 				ptr_gb_reg->flag.c = hold_byte;
 				break;
-			case 0x17: // RLA
+			// RLA
+			case 0x17:
 				hold_byte = (ptr_gb_reg->a & 0x80) >> 7;
 				ptr_gb_reg->a = (ptr_gb_reg->a << 1) + ptr_gb_reg->flag.c;
 				flag_do_z(ptr_gb_reg, ptr_gb_reg->a);
@@ -294,6 +296,18 @@ int main(int argc, char **argv) {
 				ptr_gb_reg->flag.c = hold_byte;
 				break;
 
+			// LOADS 8-bit
+			// LD (reg, no HL), d8
+			case 0x06: case 0x0E: case 0x16: case 0x1E: case 0x26: case 0x2E: case 0x3E:
+				reg_variable = (opcode & 0x38) >> 3;
+				(*ptr_op_reg_u8[reg_variable]) =  read_byte(gb_memory, pc + 1);
+				break;
+			// LD A,rr
+			case 0x0A: case 0x1A:
+				reg_variable = (opcode & 0x30) >> 4;
+				hold_addr = (*ptr_op_reg_u16[reg_variable]);
+				ptr_gb_reg->a = read_byte(gb_memory, hold_addr);
+				break;
 			// LD (reg, no HL), (reg, no HL)
 			case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x47:
 			case 0x48: case 0x49: case 0x4A: case 0x4B: case 0x4C: case 0x4D: case 0x4F:
@@ -307,38 +321,16 @@ int main(int argc, char **argv) {
 				(*ptr_op_reg_u8[reg_variable]) = (*ptr_op_reg_u8[reg_value]);
 				break;
 			// LD reg, (HL)
-			case 0x46: case 0x4E:
-			case 0x56: case 0x5E:
-			case 0x66: case 0x6E:
-			case 0x7E:
+			case 0x46: case 0x4E: case 0x56: case 0x5E: case 0x66: case 0x6E: case 0x7E:
 				reg_variable = (opcode & 0x38) >> 3;
 				(*ptr_op_reg_u8[reg_variable]) = read_byte(gb_memory, ptr_gb_reg->hl);
 				break;
-			// LD (HL), reg
-			case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x77:
-				reg_value = (opcode & 0x07);
-				write_byte(gb_memory, ptr_gb_reg->hl, (*ptr_op_reg_u8[reg_value]) );
-				break;
-			// LD (reg, no HL), d8
-			case 0x06: case 0x0E: case 0x16: case 0x1E: case 0x26: case 0x2E: case 0x3E:
-				reg_variable = (opcode & 0x38) >> 3;
-				(*ptr_op_reg_u8[reg_variable]) =  read_byte(gb_memory, pc + 1);
-				break;
-			// LD (HL), d8
-			case 0x36:
-				hold_byte = read_byte(gb_memory, pc + 1);
-				write_byte(gb_memory, ptr_gb_reg->hl, hold_byte);
-				break;
+
+			// LOADS 16-bit
 			// LD rr, d8
 			case 0x01: case 0x11: case 0x21: case 0x31:
 				reg_variable = (0x30 & opcode) >> 4;
 				(*ptr_op_reg_u16[reg_variable]) = read_short(gb_memory, pc + 1);
-				break;
-			// LD A,rr
-		case 0x0A: case 0x1A:
-				reg_variable = (opcode & 0x30) >> 4;
-				hold_addr = (*ptr_op_reg_u16[reg_variable]);
-				ptr_gb_reg->a = read_byte(gb_memory, hold_addr);
 				break;
 			// LD (rr), A
 			case 0x02: case 0x12:
@@ -349,32 +341,41 @@ int main(int argc, char **argv) {
 			case 0x22:
 				write_byte(gb_memory, ptr_gb_reg->hl++, ptr_gb_reg->a);
 				break;
-			case 0x32:
 			// LD (HL-), A
+			case 0x32:
 				write_byte(gb_memory, ptr_gb_reg->hl--, ptr_gb_reg->a);
 				break;
-
-			// STACK
-			case 0xC5: case 0xD5: case 0xE5: // PUSH
-				reg_variable = (0x30 & opcode) >> 4;
-				hold_ptr_u16 = &ptr_gb_reg->bc + reg_variable;
-				cpu_stack_push(ptr_gb_reg, gb_memory, *hold_ptr_u16);
+			// LD (HL), d8
+			case 0x36:
+				hold_byte = read_byte(gb_memory, pc + 1);
+				write_byte(gb_memory, ptr_gb_reg->hl, hold_byte);
 				break;
-			case 0xC1: case 0xD1: case 0xE1: // POP
+			// LD (HL), reg
+			case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x77:
+				reg_value = (opcode & 0x07);
+				write_byte(gb_memory, ptr_gb_reg->hl, (*ptr_op_reg_u8[reg_value]) );
+				break;
+			// STACK
+			// POP rr
+			case 0xC1: case 0xD1: case 0xE1:
 				reg_variable = (0x30 & opcode) >> 4;
 				hold_ptr_u16 = &ptr_gb_reg->bc + reg_variable;
 				*hold_ptr_u16 = cpu_stack_pop(ptr_gb_reg, gb_memory);
 				break;
-			case 0xC9: // RET
+			// PUSH rr
+			case 0xC5: case 0xD5: case 0xE5:
+				reg_variable = (0x30 & opcode) >> 4;
+				hold_ptr_u16 = &ptr_gb_reg->bc + reg_variable;
+				cpu_stack_push(ptr_gb_reg, gb_memory, *hold_ptr_u16);
+				break;
+			// RET
+			case 0xC9:
 				ptr_gb_reg->pc = cpu_stack_pop(ptr_gb_reg, gb_memory);
 				break;
 
-			// ALU
+			// ALU 8-bit
 			// INC reg
-			case 0x04: case 0x0C:
-			case 0x14: case 0x1C:
-			case 0x24: case 0x2C:
-			case 0x3C:
+			case 0x04: case 0x0C: case 0x14: case 0x1C: case 0x24: case 0x2C: case 0x3C:
 				reg_variable = opcode & 0x38 >> 3;
 				value_pre = (*ptr_op_reg_u8[reg_variable])++;
 				value_post = (*ptr_op_reg_u8[reg_variable]);
@@ -383,10 +384,7 @@ int main(int argc, char **argv) {
 				ptr_gb_reg->flag.n = 0;
 				break;
 			// DEC reg
-			case 0x05: case 0x0D:
-			case 0x15: case 0x1D:
-			case 0x25: case 0x2D:
-			case 0x3D:
+			case 0x05: case 0x0D: case 0x15: case 0x1D: case 0x25: case 0x2D: case 0x3D:
 				reg_variable = (0x30 & opcode) >> 4;
 				value_pre = (*ptr_op_reg_u8[reg_variable])--;
 				value_post = (*ptr_op_reg_u8[reg_variable]);
@@ -394,6 +392,8 @@ int main(int argc, char **argv) {
 				flag_do_h(ptr_gb_reg, value_pre, 1, true);
 				ptr_gb_reg->flag.n = 1;
 				break;
+				
+			// ALU 16-bit
 			// INC rr
 			case 0x03: case 0x13: case 0x23: case 0x33: 
 				reg_variable = (0x30 & opcode) >> 4;
@@ -414,14 +414,16 @@ int main(int argc, char **argv) {
 				flag_do_h(ptr_gb_reg, ptr_gb_reg->a, hold_byte, true);
 				ptr_gb_reg->flag.c = (ptr_gb_reg->a < hold_byte) ? 1 : 0;
 				break;
-			case 0xFE: // CP d8
+			// CP d8
+			case 0xFE:
 				hold_byte = read_byte(gb_memory, pc + 1);
 				ptr_gb_reg->flag.z = (ptr_gb_reg->a == hold_byte) ? 1 : 0;
 				ptr_gb_reg->flag.n = 1;
 				flag_do_h(ptr_gb_reg, ptr_gb_reg->a, hold_byte, true);
 				ptr_gb_reg->flag.c = (ptr_gb_reg->a < hold_byte) ? 1 : 0;
 				break;
-			case 0x00: // NOP
+			// NOP
+			case 0x00:
 				break;
 			case 0xCD:
 				cpu_stack_push(ptr_gb_reg, gb_memory, pc + 3);
