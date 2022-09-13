@@ -44,7 +44,7 @@ struct Z80_Register {
 					union {
 						uint8_t f;
 						struct {
-							uint8_t ZEROFILL:4;
+							const uint8_t ZEROFILL:4;
 							uint8_t c:1, h:1, n:1, z:1;
 						} flag;
 					};
