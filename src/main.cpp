@@ -279,14 +279,19 @@ int main(int argc, char **argv) {
 
 		switch (opcode) {
 			// SHIFTS
-			case 0x17: // RLA
-				hold_byte = (ptr_gb_reg->a & 0x80);
-				ptr_gb_reg->a = (ptr_gb_reg->a << 1) + ptr_gb_reg->flag.c;
-				ptr_gb_reg->flag.h = 0;
-				ptr_gb_reg->flag.n = 0;
-
-				ptr_gb_reg->flag.c = hold_byte;
+			case 0x07: // RLCA
+				hold_byte = ( (ptr_gb_reg->a & 0x80) >> 7);
+				ptr_gb_reg->a = (ptr_gb_reg->a << 1) + hold_byte;
 				flag_do_z(ptr_gb_reg, ptr_gb_reg->a);
+				ptr_gb_reg->flag.h = ptr_gb_reg->flag.n = 0;
+				ptr_gb_reg->flag.c = hold_byte;
+				break;
+			case 0x17: // RLA
+				hold_byte = (ptr_gb_reg->a & 0x80) >> 7;
+				ptr_gb_reg->a = (ptr_gb_reg->a << 1) + ptr_gb_reg->flag.c;
+				flag_do_z(ptr_gb_reg, ptr_gb_reg->a);
+				ptr_gb_reg->flag.h = ptr_gb_reg->flag.n = 0;
+				ptr_gb_reg->flag.c = hold_byte;
 				break;
 
 			// LD (reg, no HL), (reg, no HL)
