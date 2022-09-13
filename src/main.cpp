@@ -337,6 +337,11 @@ int main(int argc, char **argv) {
 				reg_variable = (opcode & 0x30) >> 4;
 				write_byte(gb_memory, (*ptr_op_reg_u16[reg_variable]), ptr_gb_reg->a);
 				break;
+			// LD (a16), SP
+			case 0x08:
+				hold_addr = read_short(gb_memory, ptr_gb_reg->pc + 1);
+				write_byte(gb_memory, hold_addr, ptr_gb_reg->sp);
+				break;
 			// LD (HL+), A
 			case 0x22:
 				write_byte(gb_memory, ptr_gb_reg->hl++, ptr_gb_reg->a);
