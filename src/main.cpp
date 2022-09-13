@@ -404,6 +404,15 @@ int main(int argc, char **argv) {
 				reg_variable = (0x30 & opcode) >> 4;
 				(*ptr_op_reg_u16[reg_variable])++;
 				break;
+			/*
+			// ADD HL, rr
+			case 0x09: case 0x19: case 0x29: case 0x39:
+				reg_variable = (opcode & 0x30) >> 4;
+				ptr_gb_reg->hl += (*ptr_op_reg_u16[reg_variable]);
+				ptr_gb_reg->flag.n = 0;
+
+				break;
+				*/
 			// DEC rr
 			case 0x0B: case 0x1B: case 0x2B: case 0x3B: 
 				reg_variable = (0x30 & opcode) >> 4;
