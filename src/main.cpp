@@ -7,7 +7,7 @@
 
 std::string FILE_PATH;
 int rom_size;
-uint8_t reg_value, reg_variable, hold_u8_pre, hold_u8_post;
+uint8_t hold_u8_pre, hold_u8_post;
 uint8_t gb_memory[0xFFFF];
 uint8_t *ptr_op_reg_u8[8];
 uint16_t *ptr_op_reg_u16[4];
@@ -226,13 +226,17 @@ int init() {
 
 // PREFIX CB
 void prefix_cb(int opcode) {
-	reg_variable = (opcode & 0x07);
+	uint8_t reg_variable_u8, reg_value_u8;
 	uint8_t hold_bit;
-	uint8_t *hold_ptr_u8 = ptr_op_reg_u8[reg_variable];
+	uint8_t *hold_ptr_u8;
+
+	reg_variable_u8 = (opcode & 0x07);
+	hold_ptr_u8 = ptr_op_reg_u8[reg_variable_u8];
+
 	switch(opcode) {
 		// RLC b, r
 	/*	case 0x00: case 0x01: case 0x02: case 0x03: case 0x04: case 0x05: case 0x07:
-			reg_variable = (opcode & 0x07);
+			reg_variable_u8 = (opcode & 0x07);
 			ptr_gb_reg->pc = 0xfffff;
 			dbg_stop_inject();
 			break;*/
@@ -240,12 +244,12 @@ void prefix_cb(int opcode) {
 		case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x17:
 			hold_bit = ((*hold_ptr_u8) & 0x80) >> 7;
 			*hold_ptr_u8 = ((*hold_ptr_u8) << 1) + ptr_gb_reg->flag.c;
-			ptr_gb_reg->flag.z = ( (*hold_ptr_u8) == 0 );
+			ptr_gb_reg->flag.z = ( (*hold_ptr_u8) == 0 ) ? 1 : 0;
 			ptr_gb_reg->flag.n = 0;
 			ptr_gb_reg->flag.h = 0;
 			ptr_gb_reg->flag.c = hold_bit;
 			break;
-		// BIT b, r ()
+		// BIT b, r
 		case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x47:
 		case 0x48: case 0x49: case 0x4A: case 0x4B: case 0x4C: case 0x4D: case 0x4F:
 		case 0x50: case 0x51: case 0x52: case 0x53: case 0x54: case 0x55: case 0x57:
@@ -254,8 +258,8 @@ void prefix_cb(int opcode) {
 		case 0x68: case 0x69: case 0x6A: case 0x6B: case 0x6C: case 0x6D: case 0x6F:
 		case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x77:
 		case 0x78: case 0x79: case 0x7A: case 0x7B: case 0x7C: case 0x7D: case 0x7F:
-			reg_value = 1 << ((opcode & 0x38) >> 3); // MASK
-			ptr_gb_reg->flag.z = ( ((*hold_ptr_u8) & reg_value) == 0 );
+			reg_value_u8 = 1 << ((opcode & 0x38) >> 3); // MASK
+			ptr_gb_reg->flag.z = ( ((*hold_ptr_u8) & reg_value_u8) == 0 ) ? 1 : 0;
 			ptr_gb_reg->flag.n = 0;
 			ptr_gb_reg->flag.h = 1;
 			break;
@@ -266,17 +270,19 @@ void prefix_cb(int opcode) {
 }
 
 int main(int argc, char **argv) {
-	printf("%s\n", (char*)TITLE);
-	if( handle_user_argument(argc, argv) ||
-			file_load(gb_memory, FILE_PATH)  ||
-			init() ) return 1;
-
-
-	printf("PROGRAM START\n");
-
-	uint8_t opcode, hold_byte;
+	uint8_t opcode, hold_byte, hold_bit;
+	uint8_t reg_variable_u8, reg_value_u8;
 	uint16_t pc, hold_addr;
 	uint16_t *hold_ptr_u16;
+
+	printf("%s\n", (char*)TITLE);
+
+	if( handle_user_argument(argc, argv) ||
+			file_load(gb_memory, FILE_PATH)  ||
+			init()
+			) return 1;
+
+	printf("PROGRAM START\n");
 	program_stop = false;
 
 	while (!program_stop) {
@@ -289,32 +295,58 @@ int main(int argc, char **argv) {
 			// ROTATES AND SHIFTS
 			// RLCA
 			case 0x07:
-				hold_byte = ( (ptr_gb_reg->a & 0x80) >> 7);
-				ptr_gb_reg->a = (ptr_gb_reg->a << 1) + hold_byte;
-				flag_do_z(ptr_gb_reg, ptr_gb_reg->a);
-				ptr_gb_reg->flag.h = ptr_gb_reg->flag.n = 0;
-				ptr_gb_reg->flag.c = hold_byte;
+				hold_bit = ((ptr_gb_reg->a & 0x80) >> 7);
+				ptr_gb_reg->a = (ptr_gb_reg->a << 1) + hold_bit;
+				ptr_gb_reg->flag.z = ( ptr_gb_reg->a == 0 ) ? 1 : 0;
+				ptr_gb_reg->flag.h = 0;
+				ptr_gb_reg->flag.n = 0;
+				ptr_gb_reg->flag.c = hold_bit;
 				break;
 			// RLA
 			case 0x17:
-				hold_byte = (ptr_gb_reg->a & 0x80) >> 7;
+				hold_bit = (ptr_gb_reg->a & 0x80) >> 7;
 				ptr_gb_reg->a = (ptr_gb_reg->a << 1) + ptr_gb_reg->flag.c;
-				flag_do_z(ptr_gb_reg, ptr_gb_reg->a);
+				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
 				ptr_gb_reg->flag.h = ptr_gb_reg->flag.n = 0;
-				ptr_gb_reg->flag.c = hold_byte;
+				ptr_gb_reg->flag.c = hold_bit;
+				break;
+			// RRCA
+			case 0x0F:
+				hold_bit = (ptr_gb_reg->a & 1);
+				ptr_gb_reg->a = (hold_bit << 7) + (ptr_gb_reg->a >> 1);
+				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
+				ptr_gb_reg->flag.h = 0;
+				ptr_gb_reg->flag.n = 0;
+				ptr_gb_reg->flag.c = hold_bit;
+				break;
+			// RRA
+			case 0x1F:
+				hold_bit = (ptr_gb_reg->a & 1);
+				ptr_gb_reg->a = (ptr_gb_reg->c << 7) + (ptr_gb_reg->a >> 1);
+				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
+				ptr_gb_reg->flag.h = ptr_gb_reg->flag.n = 0;
+				ptr_gb_reg->flag.c = hold_bit;
 				break;
 
 			// LOADS 8-bit
 			// LD (reg, no HL), d8
 			case 0x06: case 0x0E: case 0x16: case 0x1E: case 0x26: case 0x2E: case 0x3E:
-				reg_variable = (opcode & 0x38) >> 3;
-				(*ptr_op_reg_u8[reg_variable]) =  read_byte(gb_memory, pc + 1);
+				reg_variable_u8 = (opcode & 0x38) >> 3;
+				(*ptr_op_reg_u8[reg_variable_u8]) =  read_byte(gb_memory, pc + 1);
 				break;
 			// LD A,rr
 			case 0x0A: case 0x1A:
-				reg_variable = (opcode & 0x30) >> 4;
-				hold_addr = (*ptr_op_reg_u16[reg_variable]);
+				reg_variable_u8 = (opcode & 0x30) >> 4;
+				hold_addr = (*ptr_op_reg_u16[reg_variable_u8]);
 				ptr_gb_reg->a = read_byte(gb_memory, hold_addr);
+				break;
+			// LD A, HL+
+			case 0x2A:
+				ptr_gb_reg->a = read_byte(gb_memory, ptr_gb_reg->hl++);
+				break;
+			// LD A, HL-
+			case 0x3A:
+				ptr_gb_reg->a = read_byte(gb_memory, ptr_gb_reg->hl--);
 				break;
 			// LD (reg, no HL), (reg, no HL)
 			case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x47:
@@ -324,26 +356,42 @@ int main(int argc, char **argv) {
 			case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x67:
 			case 0x68: case 0x69: case 0x6A: case 0x6B: case 0x6C: case 0x6D: case 0x6F:
 			case 0x78: case 0x79: case 0x7A: case 0x7B: case 0x7C: case 0x7D: case 0x7F:
-				reg_value = (opcode & 7);
-				reg_variable = (opcode & 0x38) >> 3;
-				(*ptr_op_reg_u8[reg_variable]) = (*ptr_op_reg_u8[reg_value]);
+				reg_value_u8 = (opcode & 7);
+				reg_variable_u8 = (opcode & 0x38) >> 3;
+				(*ptr_op_reg_u8[reg_variable_u8]) = (*ptr_op_reg_u8[reg_value_u8]);
 				break;
 			// LD reg, (HL)
 			case 0x46: case 0x4E: case 0x56: case 0x5E: case 0x66: case 0x6E: case 0x7E:
-				reg_variable = (opcode & 0x38) >> 3;
-				(*ptr_op_reg_u8[reg_variable]) = read_byte(gb_memory, ptr_gb_reg->hl);
+				reg_variable_u8 = (opcode & 0x38) >> 3;
+				(*ptr_op_reg_u8[reg_variable_u8]) = read_byte(gb_memory, ptr_gb_reg->hl);
+				break;
+			case 0xE0: // LDH (a8), A
+				hold_addr = 0xFF00 + read_byte(gb_memory, pc + 1);
+				write_byte(gb_memory, hold_addr, ptr_gb_reg->a);
+				break;
+			case 0xF0: // LDH A, (a8)
+				hold_addr = 0xFF00 + read_byte(gb_memory, pc + 1);
+				ptr_gb_reg->a = read_byte(gb_memory, hold_addr);
+				break;
+			case 0xE2: // LD (C), A
+				hold_addr = 0xFF00 + ptr_gb_reg->c;
+				write_byte(gb_memory, hold_addr, ptr_gb_reg->a);
+				break;
+			case 0xF2: // LDH A, (C)
+				hold_addr = 0xFF00 + ptr_gb_reg->c;
+				ptr_gb_reg->a = read_byte(gb_memory, hold_addr);
 				break;
 
 			// LOADS 16-bit
 			// LD rr, d8
 			case 0x01: case 0x11: case 0x21: case 0x31:
-				reg_variable = (0x30 & opcode) >> 4;
-				(*ptr_op_reg_u16[reg_variable]) = read_short(gb_memory, pc + 1);
+				reg_variable_u8 = (0x30 & opcode) >> 4;
+				(*ptr_op_reg_u16[reg_variable_u8]) = read_short(gb_memory, pc + 1);
 				break;
 			// LD (rr), A
 			case 0x02: case 0x12:
-				reg_variable = (opcode & 0x30) >> 4;
-				write_byte(gb_memory, (*ptr_op_reg_u16[reg_variable]), ptr_gb_reg->a);
+				reg_variable_u8 = (opcode & 0x30) >> 4;
+				write_byte(gb_memory, (*ptr_op_reg_u16[reg_variable_u8]), ptr_gb_reg->a);
 				break;
 			// LD (a16), SP
 			case 0x08:
@@ -365,34 +413,53 @@ int main(int argc, char **argv) {
 				break;
 			// LD (HL), reg
 			case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x77:
-				reg_value = (opcode & 0x07);
-				write_byte(gb_memory, ptr_gb_reg->hl, (*ptr_op_reg_u8[reg_value]) );
+				reg_value_u8 = (opcode & 0x07);
+				write_byte(gb_memory, ptr_gb_reg->hl, (*ptr_op_reg_u8[reg_value_u8]) );
 				break;
 
-			// STACK
+			// JUMPS AND STACKS
+			// JR r8
+			case 0x18:
+				ptr_gb_reg->pc += int8_t(read_byte(gb_memory, pc + 1));
+				break;
+			case 0x20: // JMP NZ, signed d8 + pc
+			case 0x28: // JMP Z, signed d8 + pc
+				reg_value_u8 = ((opcode & 0x08) >> 3);
+				cpu_conditon_jump_signed(ptr_gb_reg, ptr_gb_reg->flag.z, reg_value_u8, int8_t(read_byte(gb_memory, pc + 1)));
+				break;
+			case 0x30: // JMP NC, signed d8 + pc
+			case 0x38: // JMP C, signed d8 + pc
+				reg_value_u8 = ((opcode & 0x08) >> 3);
+				cpu_conditon_jump_signed(ptr_gb_reg, ptr_gb_reg->flag.c, reg_value_u8, int8_t(read_byte(gb_memory, pc + 1)));
+				break;
 			// POP rr
 			case 0xC1: case 0xD1: case 0xE1:
-				reg_variable = (0x30 & opcode) >> 4;
-				hold_ptr_u16 = (&ptr_gb_reg->bc) + reg_variable;
+				reg_variable_u8 = (0x30 & opcode) >> 4;
+				hold_ptr_u16 = (&ptr_gb_reg->bc) + reg_variable_u8;
 				(*hold_ptr_u16) = cpu_stack_pop(ptr_gb_reg, gb_memory);
 				break;
 			// PUSH rr
 			case 0xC5: case 0xD5: case 0xE5:
-				reg_variable = (0x30 & opcode) >> 4;
-				hold_ptr_u16 = (&ptr_gb_reg->bc) + reg_variable;
+				reg_variable_u8 = (0x30 & opcode) >> 4;
+				hold_ptr_u16 = (&ptr_gb_reg->bc) + reg_variable_u8;
 				cpu_stack_push(ptr_gb_reg, gb_memory, (*hold_ptr_u16));
 				break;
 			// RET
 			case 0xC9:
 				ptr_gb_reg->pc = cpu_stack_pop(ptr_gb_reg, gb_memory);
 				break;
+			// CALL
+			case 0xCD:
+				cpu_stack_push(ptr_gb_reg, gb_memory, pc + 3);
+				ptr_gb_reg->pc = read_short(gb_memory, pc + 1);
+				break;
 
 			// ALU 8-bit
 			// INC reg
 			case 0x04: case 0x0C: case 0x14: case 0x1C: case 0x24: case 0x2C: case 0x3C:
-				reg_variable = opcode & 0x38 >> 3;
-				hold_u8_pre = (*ptr_op_reg_u8[reg_variable])++;
-				hold_u8_post = (*ptr_op_reg_u8[reg_variable]);
+				reg_variable_u8 = opcode & 0x38 >> 3;
+				hold_u8_pre = (*ptr_op_reg_u8[reg_variable_u8])++;
+				hold_u8_post = (*ptr_op_reg_u8[reg_variable_u8]);
 				flag_do_z(ptr_gb_reg, hold_u8_post);
 				flag_do_h(ptr_gb_reg, hold_u8_pre, 1, false);
 				ptr_gb_reg->flag.n = 0;
@@ -417,9 +484,9 @@ int main(int argc, char **argv) {
 				break;
 			// DEC reg
 			case 0x05: case 0x0D: case 0x15: case 0x1D: case 0x25: case 0x2D: case 0x3D:
-				reg_variable = (0x30 & opcode) >> 4;
-				hold_u8_pre = (*ptr_op_reg_u8[reg_variable])--;
-				hold_u8_post = (*ptr_op_reg_u8[reg_variable]);
+				reg_variable_u8 = (0x30 & opcode) >> 4;
+				hold_u8_pre = (*ptr_op_reg_u8[reg_variable_u8])--;
+				hold_u8_post = (*ptr_op_reg_u8[reg_variable_u8]);
 				flag_do_z(ptr_gb_reg, hold_u8_post);
 				flag_do_h(ptr_gb_reg, hold_u8_pre, 1, true);
 				ptr_gb_reg->flag.n = 1;
@@ -428,28 +495,60 @@ int main(int argc, char **argv) {
 			// ALU 16-bit
 			// INC rr
 			case 0x03: case 0x13: case 0x23: case 0x33: 
-				reg_variable = (0x30 & opcode) >> 4;
-				(*ptr_op_reg_u16[reg_variable])++;
+				reg_variable_u8 = (0x30 & opcode) >> 4;
+				(*ptr_op_reg_u16[reg_variable_u8])++;
 				break;
-			/*
 			// ADD HL, rr
 			case 0x09: case 0x19: case 0x29: case 0x39:
-				reg_variable = (opcode & 0x30) >> 4;
-				ptr_gb_reg->hl += (*ptr_op_reg_u16[reg_variable]);
+				reg_variable_u8 = (opcode & 0x30) >> 4;
+				hold_ptr_u16 = ptr_op_reg_u16[reg_variable_u8];
 				ptr_gb_reg->flag.n = 0;
-
+				ptr_gb_reg->flag.h = uint32_t((ptr_gb_reg->hl & 0x0FFF) + ((*hold_ptr_u16) & 0x0FFF)) > 0x0FFF ? 1 : 0;
+				ptr_gb_reg->flag.c = uint32_t( ptr_gb_reg->hl + (*hold_ptr_u16) ) > 0xFFFF? 1 : 0;
+				ptr_gb_reg->hl += (*hold_ptr_u16);
 				break;
-				*/
 			// DEC rr
 			case 0x0B: case 0x1B: case 0x2B: case 0x3B: 
-				reg_variable = (0x30 & opcode) >> 4;
-				(*ptr_op_reg_u16[reg_variable])--;
+				reg_variable_u8 = (0x30 & opcode) >> 4;
+				(*ptr_op_reg_u16[reg_variable_u8])--;
 				break;
 
+			// SCF
+			case 0x37:
+				ptr_gb_reg->flag.n = 0;
+				ptr_gb_reg->flag.h = 0;
+				ptr_gb_reg->flag.c = 1;
+				break;
+			// DAA
+			case 0x27:
+				if ((ptr_gb_reg->a & 0x0F) > 0x09 || ptr_gb_reg->flag.h) {
+					ptr_gb_reg->a += 0x06;
+				}
+				if ( ((ptr_gb_reg->a & 0xF0) >> 4) > 0x09 || ptr_gb_reg->flag.c) {
+					ptr_gb_reg->a += 0x60;
+					ptr_gb_reg->flag.c = 1;
+				} else {
+					ptr_gb_reg->flag.c = 1;
+				}
+				ptr_gb_reg->flag.z = ( ptr_gb_reg->a == 0 ) ? 1 : 0;
+				ptr_gb_reg->flag.h = 0;
+				break;
+			// CPL
+			case 0x2F:
+				ptr_gb_reg->a = ~ptr_gb_reg->a;
+				ptr_gb_reg->flag.n = 1;
+				ptr_gb_reg->flag.h = 1;
+				break;
+			// CCF
+			case 0x3F:
+				ptr_gb_reg->flag.c = (ptr_gb_reg->flag.c) ? 0 : 1;
+				ptr_gb_reg->flag.n = 0;
+				ptr_gb_reg->flag.h = 0;
+				break;
 			// CP r
 			case 0xB8: case 0xB9: case 0xBA: case 0xBB: case 0xBC: case 0xBD: case 0xBF:
-				reg_variable = (opcode & 0x7);
-				hold_byte = (*ptr_op_reg_u8[reg_variable]);
+				reg_variable_u8 = (opcode & 0x7);
+				hold_byte = (*ptr_op_reg_u8[reg_variable_u8]);
 				ptr_gb_reg->flag.z = (ptr_gb_reg->a == hold_byte);
 				ptr_gb_reg->flag.n = 1;
 				flag_do_h(ptr_gb_reg, ptr_gb_reg->a, hold_byte, true);
@@ -466,21 +565,6 @@ int main(int argc, char **argv) {
 			// NOP
 			case 0x00:
 				break;
-			// CALL
-			case 0xCD:
-				cpu_stack_push(ptr_gb_reg, gb_memory, pc + 3);
-				ptr_gb_reg->pc = read_short(gb_memory, pc + 1);
-				break;
-			case 0x20: // JMP NZ, signed d8 + pc
-			case 0x28: // JMP Z, signed d8 + pc
-				reg_value = ((opcode & 0x08) >> 3);
-				cpu_conditon_jump_signed(ptr_gb_reg, ptr_gb_reg->flag.z, reg_value, int8_t(read_byte(gb_memory, pc + 1)));
-				break;
-			case 0x30: // JMP NC, signed d8 + pc
-			case 0x38: // JMP C, signed d8 + pc
-				reg_value = ((opcode & 0x08) >> 3);
-				cpu_conditon_jump_signed(ptr_gb_reg, ptr_gb_reg->flag.c, reg_value, int8_t(read_byte(gb_memory, pc + 1)));
-				break;
 			case 0xAF: // XOR A
 				ptr_gb_reg->a ^= ptr_gb_reg->a;
 				flag_do_z(ptr_gb_reg, ptr_gb_reg->a);
@@ -493,23 +577,7 @@ int main(int argc, char **argv) {
 				ptr_gb_reg->pc++;
 				prefix_cb(opcode);
 				break;
-			// LOADS ($ff(a8))
-			case 0xE0: // LDH (a8), A
-				hold_addr = 0xFF00 + read_byte(gb_memory, pc + 1);
-				write_byte(gb_memory, hold_addr, ptr_gb_reg->a);
-				break;
-			case 0xF0: // LDH A, (a8)
-				hold_addr = 0xFF00 + read_byte(gb_memory, pc + 1);
-				ptr_gb_reg->a = read_byte(gb_memory, hold_addr);
-				break;
-			case 0xE2: // LD (C), A
-				hold_addr = 0xFF00 + ptr_gb_reg->c;
-				write_byte(gb_memory, hold_addr, ptr_gb_reg->a);
-				break;
-			case 0xF2: // LDH A, (C)
-				hold_addr = 0xFF00 + ptr_gb_reg->c;
-				ptr_gb_reg->a = read_byte(gb_memory, hold_addr);
-				break;
+			
 			default:
 				printf("0x%02X: Unknown opcode!\n", opcode);
 				return 1;
