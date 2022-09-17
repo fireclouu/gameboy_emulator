@@ -2,8 +2,11 @@
 #include <fstream>
 #include <string>
 #include <sys/stat.h>
+#include <signal.h>
 
+#include "opcode.hpp"
 #include "main.hpp"
+#include "debug.hpp"
 
 bool program_stop;
 uint8_t hold_u8_pre, hold_u8_post;
@@ -14,57 +17,29 @@ int rom_size;
 std::string FILE_PATH;
 Z80_Register gb_register;
 Z80_Register *ptr_gb_reg;
-
-const int OP_BYTES[] = {
-	1, 3, 1, 1, 1, 1, 2, 1, 3, 1, 1, 1, 1, 1, 2, 1,
-	2, 3, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1,
-	2, 3, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1,
-	2, 3, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 3, 3, 3, 1, 2, 1, 1, 1, 3, 1, 3, 3, 2, 1,
-	1, 1, 3, 0, 3, 1, 2, 1, 1, 1, 3, 0, 3, 0, 2, 1,
-	2, 1, 1, 0, 0, 1, 2, 1, 2, 1, 3, 0, 0, 0, 2, 1,
-	2, 1, 1, 1, 0, 1, 2, 1, 2, 1, 3, 1, 0, 0, 2, 1,
-};
-
+Debugger *debugger;
 // mmu
 uint8_t read_byte(uint8_t *memory, uint16_t addr) {
 	return memory[addr];
 };
-
 uint16_t read_short(uint8_t *memory, uint16_t addr) {
 	return (memory[addr + 1] << 8) + memory[addr];
 };
-
 void write_byte(uint8_t *memory, uint16_t addr, uint8_t value) {
-	if (addr < 0x00ff) {
-		printf("\n\nWRITE_ADDR: 0x%04X: invalid write! overwriting ROM FILE!\n", addr);
+	if (addr < rom_size) {
+		printf("W: 0x%04X: overwriting ROM file!\n", addr);
+		debugger->dbgEnd(1);
 		program_stop = true;
+	} else {
+		memory[addr] = value;
 	}
-	memory[addr] = value;
 };
 // mmu end
-
-// debugger
-void dbg_checks(Z80_Register *param_reg) {
-	if ( (param_reg->f) & 0x0F) {
-		printf("flag lsb illegally written!\n");
-		program_stop = true;
-	}
-}
-// debugger end
 
 // flags start
 void flag_do_h(Z80_Register *param_reg, int value_left, int value_right, bool subtraction) {
 	if (subtraction) {
-		param_reg->flag.h = uint8_t((value_left & 0xF) < (value_right & 0xF)) ? 1 : 0;
+		param_reg->flag.h = uint8_t((value_left & 0xF) < (value_right & 0xF)) ? 0 : 1;
 	} else {
 		param_reg->flag.h = ( ((value_left & 0xF) + (value_right & 0xF)) > 0x10) ? 1 : 0;
 	}
@@ -80,7 +55,6 @@ void build_ptr_op_reg_u8(Z80_Register *param_reg, uint8_t *param_ptr_op_reg_u8[8
 	param_ptr_op_reg_u8[6] = gb_memory; // 6
 	param_ptr_op_reg_u8[7] = &param_reg->a; // 7
 }
-
 void build_ptr_op_reg_u16(Z80_Register *param_reg, uint16_t *param_ptr_op_reg_u16[4]) {
 	param_ptr_op_reg_u16[0] = &param_reg->bc; // 0
 	param_ptr_op_reg_u16[1] = &param_reg->de; // 1
@@ -88,48 +62,105 @@ void build_ptr_op_reg_u16(Z80_Register *param_reg, uint16_t *param_ptr_op_reg_u1
 	param_ptr_op_reg_u16[3] = &param_reg->sp; // 3
 }
 
-void print_memory(uint8_t *param_memory, int param_mem_size) {
-	for (int x = 0; x < param_mem_size; x++) {
-		printf("%04X: 0x%02X   ", x, param_memory[x]);
-		if (((x +1) % 4) == 0) printf("\n");
+// binary specific function
+void handle_user_argument(int param_argc, char **param_argv) {
+	while ((++param_argv)[0]) {
+		if (param_argv[0][0] == '-') {
+			switch (param_argv[0][1]) {
+				case 'i':
+					if ((param_argv[1] == nullptr) || std::string(param_argv[1]).empty()) {
+						printf("error: provide file path\n");
+						exit(1);
+					} else {
+						FILE_PATH = param_argv[1];
+					}
+					break;
+				default:
+					printf("-%c: Unknown option\n", param_argv[0][1]);
+					exit(1);
+			}
+		}
+	}
+}
+void load_binary(uint8_t *memory, int memory_size, const std::string param_file_path) {
+	std::ifstream stream;
+	stream.open(param_file_path, std::ios::binary | std::ios::in);
+	if(stream.is_open()) {
+		while(stream.good()) {
+			stream.read((char *)memory, memory_size);
+		}
+	}
+	stream.close();
+}
+bool is_file_exist(const std::string name) {
+	bool value = false;
+	std::ifstream stream(name, std::ios::binary | std::ios::in);
+	value = stream.is_open();
+	stream.close();
+	return value;
+}
+int read_file_size(const std::string name) {
+	int x = 0;
+	std::ifstream stream(name, std::ios::binary | std::ios::in);
+	if (stream.is_open()) {
+		stream.seekg(0, std::ios::end);
+		x = stream.tellg();
+	}
+
+	stream.close();
+	return x;
+}
+void file_load(uint8_t *param_memory, std::string param_file_path) {
+	if (is_file_exist(param_file_path)) {
+		rom_size = read_file_size(param_file_path);
+		if (rom_size == 0) {
+			printf("%s: File invalid! 0 bytes.\n", param_file_path.c_str());
+			exit(1);
+		}
+	} else {
+		printf("%s: No file found in directory.\n", param_file_path.c_str());
+		exit(1);
 	}
 }
 
-void print_step(Z80_Register param_reg, uint8_t *memory, std::string prefix) {
-	printf("PC: %04X (0x%02X)  AF: %04X  BC: %04X  DE: %04X  HL: %04X  SP: %04X  %s\n",
-			param_reg.pc, memory[param_reg.pc],
-			param_reg.af, param_reg.bc,
-			param_reg.de, param_reg.hl,
-			param_reg.sp, prefix.c_str());
-	printf("MEMORY and STACK:\n");
-	for (int x = 0; x < 4; x++) {
-		int hold_pc = param_reg.pc + x;
-		int hold_sp = param_reg.sp + x;
-		if (hold_pc <= 0xFFFF) {
-			printf("[ 0x%04X: 0x%02X ]   ", hold_pc, memory[hold_pc]);
-		}
-		if (hold_sp <= 0xFFFF) {
-			printf("[ 0x%04X: 0x%02X ]", hold_sp, memory[hold_sp]);
-		}
-		printf("\n");
-	}
-	printf("\n");
+// init
+void init() {
+	ptr_gb_reg = &gb_register;
+	build_ptr_op_reg_u8(ptr_gb_reg, ptr_op_reg_u8);
+	build_ptr_op_reg_u16(ptr_gb_reg, ptr_op_reg_u16);
+	load_binary(gb_memory, rom_size, FILE_PATH);
+	printf("%s: File loaded up to $%04X memory!\n",FILE_PATH.c_str(), rom_size);
 }
 
 // cpu specific functions
 void cpu_stack_push(Z80_Register *param_reg, uint8_t *memory, uint16_t addr_value) {
-	write_byte(memory, param_reg->sp--, (addr_value & 0x00FF));
 	write_byte(memory, param_reg->sp--, (addr_value & 0xFF00) >> 8);
+	write_byte(memory, param_reg->sp--, (addr_value & 0x00FF));
 }
 uint16_t cpu_stack_pop(Z80_Register *param_reg, uint8_t *memory) {
 	hold_u8_pre = read_byte(memory, ++param_reg->sp);
 	hold_u8_post = read_byte(memory, ++param_reg->sp);
-	return ( (hold_u8_pre) << 8 ) | (hold_u8_post);
+	return ( (hold_u8_post) << 8 ) + (hold_u8_pre);
 }
-
-void cpu_conditon_jump_signed(Z80_Register *param_reg, uint8_t param_flag, uint8_t expected_bit, int8_t signed_byte_value) {
+void cpu_cc_jp_signed(Z80_Register *param_reg, uint8_t param_flag, uint8_t expected_bit, int8_t signed_byte_value) {
 	if (param_flag == expected_bit) {
-		param_reg->pc += signed_byte_value;
+		param_reg->pc += int8_t(signed_byte_value);
+	}
+}
+void cpu_cc_jp_unsigned(Z80_Register *param_reg, uint8_t param_flag, uint8_t expected_bit, uint8_t unsigned_byte_value) {
+	if (param_flag == expected_bit) {
+		param_reg->pc += uint8_t(unsigned_byte_value);
+	}
+}
+void cpu_cc_ret(Z80_Register *param_reg, uint8_t param_flag, uint8_t expected_bit) {
+	if (param_flag == expected_bit) {
+		ptr_gb_reg->pc = cpu_stack_pop(ptr_gb_reg, gb_memory);
+	}
+}
+void cpu_cc_call(Z80_Register *param_reg, uint8_t *param_mem, uint8_t param_flag, uint8_t expected_bit, uint16_t param_pc) {
+	if (param_flag == expected_bit) {
+		cpu_stack_push(param_reg, param_mem, param_pc + 3);
+		ptr_gb_reg->pc = read_short(param_mem, param_pc + 1);
 	}
 }
 void cpu_instruction_xor(Z80_Register *param_reg, uint8_t param_value) {
@@ -145,88 +176,19 @@ void cpu_instruction_cp(Z80_Register *param_reg, uint8_t param_value) {
 	flag_do_h(param_reg, param_reg->a, param_value, true);
 	param_reg->flag.c = (param_reg->a < param_value);
 }
-
-// binary specific function
-int handle_user_argument(int param_argc, char **param_argv) {
-	int exit_code = 0;
-	while ((++param_argv)[0]) {
-		if (param_argv[0][0] == '-') {
-			switch (param_argv[0][1]) {
-				case 'i':
-					if ((param_argv[1] == nullptr) || std::string(param_argv[1]).empty()) {
-						printf("error: provide file path\n");
-						exit_code = 1;
-					} else {
-						FILE_PATH = param_argv[1];
-					}
-					break;
-				default:
-					printf("-%c: Unknown option\n", param_argv[0][1]);
-					exit_code = 1;
-			}
-		}
-	}
-	return exit_code;
+void cpu_instruction_or(Z80_Register *param_reg, uint8_t param_value) {
+	param_reg->a |= param_value;
+	param_reg->flag.z = (param_reg->a == 0) ? 1 : 0;
+	param_reg->flag.n = 0;
+	param_reg->flag.h = 0;
+	param_reg->flag.c = 0;
 }
-
-void load_binary(uint8_t *memory, int memory_size, const std::string param_file_path) {
-	std::ifstream stream;
-	stream.open(param_file_path, std::ios::binary | std::ios::in);
-	if(stream.is_open()) {
-		while(stream.good()) {
-			stream.read((char *)memory, memory_size);
-		}
-	}
-	stream.close();
-}
-
-bool is_file_exist(const std::string name) {
-	bool value = false;
-	std::ifstream stream(name, std::ios::binary | std::ios::in);
-	value = stream.is_open();
-	stream.close();
-	return value;
-}
-
-int read_file_size(const std::string name) {
-	int x = 0;
-	std::ifstream stream(name, std::ios::binary | std::ios::in);
-	if (stream.is_open()) {
-		stream.seekg(0, std::ios::end);
-		x = stream.tellg();
-	}
-
-	stream.close();
-	return x;
-}
-
-int file_load(uint8_t *param_memory, std::string param_file_path) {
-	int exit_code = 0;
-
-	if (is_file_exist(param_file_path)) {
-		rom_size = read_file_size(param_file_path);
-		if (rom_size == 0) {
-			printf("%s: File invalid! 0 bytes.\n", param_file_path.c_str());
-			exit_code = 1;
-		}
-	} else {
-		printf("%s: No file found in directory.\n", param_file_path.c_str());
-		exit_code = 1;
-	}
-
-	return exit_code;
-}
-
-// init
-int init() {
-	int exit_code = 0;
-
-	ptr_gb_reg = &gb_register;
-	build_ptr_op_reg_u8(ptr_gb_reg, ptr_op_reg_u8);
-	build_ptr_op_reg_u16(ptr_gb_reg, ptr_op_reg_u16);
-	load_binary(gb_memory, rom_size, FILE_PATH);
-	printf("%s: File loaded with %d bytes!\n",FILE_PATH.c_str(), rom_size);
-	return exit_code;
+void cpu_instruction_and(Z80_Register *param_reg, uint8_t param_value) {
+	param_reg->a &= param_value;
+	param_reg->flag.z = (param_reg->a == 0) ? 1 : 0;
+	param_reg->flag.n = 0;
+	param_reg->flag.h = 1;
+	param_reg->flag.c = 0;
 }
 
 // PREFIX CB
@@ -280,23 +242,52 @@ int main(int argc, char **argv) {
 	uint16_t pc, hold_addr;
 	uint16_t *hold_ptr_u16;
 
+
 	printf("%s\n", (char*)TITLE);
 
-	if( handle_user_argument(argc, argv) ||
-			file_load(gb_memory, FILE_PATH)  ||
-			init()
-			) return 1;
+	handle_user_argument(argc, argv);
+	file_load(gb_memory, FILE_PATH);
+	init();
 
-	printf("PROGRAM START\n");
+	printf("\nPROGRAM START\n");
 	program_stop = false;
+	ptr_gb_reg->pc = 0x0100;
+	ptr_gb_reg->sp = 0xFFFE;
+	ptr_gb_reg->a = 0x01;
+	ptr_gb_reg->b = 0xFF;
+	ptr_gb_reg->c = 0x13;
+	ptr_gb_reg->e = 0xC1;
+	ptr_gb_reg->hl = 0x8403;
+
+	// debugs
+	debugger = new Debugger(ptr_gb_reg, gb_memory);
+	//signal(SIGINT, debugger->dbgEnd(1));
 
 	while (!program_stop) {
-		print_step(*ptr_gb_reg, gb_memory, "");
+		debugger->debugStepInteractive();
+		// blarggs test - serial output
+		if (gb_memory[0xff02] == 0x81) {
+			char c = gb_memory[0xff01]; 
+			printf("%c", c); 
+			gb_memory[0xff02] = 0x01;
+		}
+
 		pc = ptr_gb_reg->pc;
 		opcode = gb_memory[pc];
 		ptr_gb_reg->pc += OP_BYTES[opcode];
 
 		switch (opcode) {
+			// ILLEGAL
+			case 0xD3: case 0xDB: case 0xDD:
+			case 0xE3: case 0xE4: case 0xEB: case 0xEC: case 0xED:
+			case 0xF4: case 0xFC: case 0xFD:
+				printf("ACCESSED ILLEGAL OPCODE!\n");
+				ptr_gb_reg->pc++;
+				break;
+			// SPECIAL
+			// NOP
+			case 0x00: case 0x10: case 0x76: case 0xF3: case 0xFB:
+				break;
 			// ROTATES AND SHIFTS
 			// RLCA
 			case 0x07:
@@ -370,7 +361,9 @@ int main(int argc, char **argv) {
 			// LD reg, (HL)
 			case 0x46: case 0x4E: case 0x56: case 0x5E: case 0x66: case 0x6E: case 0x7E:
 				parse_opcode_addr = (opcode & 0x38) >> 3;
-				(*ptr_op_reg_u8[parse_opcode_addr]) = read_byte(gb_memory, ptr_gb_reg->hl);
+				hold_addr = (*ptr_op_reg_u16[parse_opcode_addr]);
+				hold_byte = read_byte(gb_memory, hold_addr);
+				(*ptr_op_reg_u8[parse_opcode_addr]) = hold_byte;
 				break;
 			case 0xE0: // LDH (a8), A
 				hold_addr = 0xFF00 + read_byte(gb_memory, pc + 1);
@@ -398,9 +391,10 @@ int main(int argc, char **argv) {
 			// LD (rr), A
 			case 0x02: case 0x12:
 				parse_opcode_addr = (opcode & 0x30) >> 4;
-				write_byte(gb_memory, (*ptr_op_reg_u16[parse_opcode_addr]), ptr_gb_reg->a);
+				hold_addr = (*ptr_op_reg_u16[parse_opcode_addr]);
+				write_byte(gb_memory, hold_addr, ptr_gb_reg->a);
 				break;
-			// LD (a16), SP
+			// LD (nn), SP
 			case 0x08:
 				hold_addr = read_short(gb_memory, ptr_gb_reg->pc + 1);
 				write_byte(gb_memory, hold_addr, ptr_gb_reg->sp);
@@ -423,21 +417,54 @@ int main(int argc, char **argv) {
 				parse_opcode_addr = (opcode & 0x07);
 				write_byte(gb_memory, ptr_gb_reg->hl, (*ptr_op_reg_u8[parse_opcode_addr]) );
 				break;
+			// LD HL, SP+r8
+			case 0xF8:
+				hold_byte = read_byte(gb_memory, pc + 1);
+				ptr_gb_reg->flag.h = uint32_t((ptr_gb_reg->sp & 0x0FFF) + ((hold_byte) & 0x0FFF)) > 0x0FFF ? 1 : 0;
+				ptr_gb_reg->flag.c = uint32_t( ptr_gb_reg->sp + (int8_t)(hold_byte) ) > 0xFFFF? 1 : 0;
+				ptr_gb_reg->flag.z = 0;
+				ptr_gb_reg->flag.n = 0;
+				ptr_gb_reg->hl = (ptr_gb_reg->sp + (int8_t)(hold_byte));
+				break;
+			// LD SP, HL
+			case 0xF9:
+				ptr_gb_reg->sp = ptr_gb_reg->hl;
+				break;
+			// LD (nn), A
+			case 0xEA:
+				hold_addr = read_short(gb_memory, pc + 1);
+				write_byte(gb_memory, hold_addr, ptr_gb_reg->a);
+				break;
+			// LD A, d16
+			case 0xFA:
+				hold_addr = read_short(gb_memory, pc + 1);
+				ptr_gb_reg->a = read_byte(gb_memory, hold_addr);
+				break;
 
 			// JUMPS AND STACKS
 			// JR r8
 			case 0x18:
 				ptr_gb_reg->pc += int8_t(read_byte(gb_memory, pc + 1));
 				break;
-			case 0x20: // JMP NZ, signed d8 + pc
-			case 0x28: // JMP Z, signed d8 + pc
+			case 0x20: // JP NZ, signed d8 + pc
+			case 0x28: // JP Z, signed d8 + pc
 				parse_opcode_val = ((opcode & 0x08) >> 3);
-				cpu_conditon_jump_signed(ptr_gb_reg, ptr_gb_reg->flag.z, parse_opcode_val, int8_t(read_byte(gb_memory, pc + 1)));
+				cpu_cc_jp_signed(ptr_gb_reg, ptr_gb_reg->flag.z, parse_opcode_val, int8_t(read_byte(gb_memory, pc + 1)));
 				break;
-			case 0x30: // JMP NC, signed d8 + pc
-			case 0x38: // JMP C, signed d8 + pc
+			case 0x30: // JP NC, signed d8 + pc
+			case 0x38: // JP C, signed d8 + pc
 				parse_opcode_val = ((opcode & 0x08) >> 3);
-				cpu_conditon_jump_signed(ptr_gb_reg, ptr_gb_reg->flag.c, parse_opcode_val, int8_t(read_byte(gb_memory, pc + 1)));
+				cpu_cc_jp_signed(ptr_gb_reg, ptr_gb_reg->flag.c, parse_opcode_val, int8_t(read_byte(gb_memory, pc + 1)));
+				break;
+			// RET Z FLAG
+			case 0xC0: case 0xC8:
+				parse_opcode_val = ((opcode & 0x08) >> 3);
+				cpu_cc_ret(ptr_gb_reg, ptr_gb_reg->flag.z, parse_opcode_val);
+				break;
+			// RET C FLAG
+			case 0xD0: case 0xD8:
+				parse_opcode_val = ((opcode & 0x08) >> 3);
+				cpu_cc_ret(ptr_gb_reg, ptr_gb_reg->flag.c, parse_opcode_val);
 				break;
 			// POP rr
 			case 0xC1: case 0xD1: case 0xE1:
@@ -445,11 +472,42 @@ int main(int argc, char **argv) {
 				hold_ptr_u16 = (&ptr_gb_reg->bc) + parse_opcode_addr;
 				(*hold_ptr_u16) = cpu_stack_pop(ptr_gb_reg, gb_memory);
 				break;
+			// POP AF
+			case 0xF1:
+				ptr_gb_reg->af = cpu_stack_pop(ptr_gb_reg, gb_memory) & 0xFFF0;	
+			// JP Z FLAG, a16
+			case 0xC2: case 0xCA:
+				parse_opcode_val = (0x08 & opcode) >> 3;
+				cpu_cc_jp_unsigned(ptr_gb_reg, ptr_gb_reg->flag.z, parse_opcode_val, read_short(gb_memory, pc + 1));
+				break;
+			// JP a16
+			case 0xC3:
+				ptr_gb_reg->pc = read_short(gb_memory, pc + 1);
+				break;
+			// CALL Z FLAG
+			case 0xC4: case 0xCC:
+				parse_opcode_val = (0x08 & opcode) >> 3;
+				cpu_cc_call(ptr_gb_reg, gb_memory, ptr_gb_reg->flag.z, parse_opcode_val, pc);
+				break;
+			// CALL C FLAG
+			case 0xD4: case 0xDC:
+				parse_opcode_val = (0x08 & opcode) >> 3;
+				cpu_cc_call(ptr_gb_reg, gb_memory, ptr_gb_reg->flag.c, parse_opcode_val, pc);
+				break;
+			// JP C FLAG, a16
+			case 0xD2: case 0xDA:
+				parse_opcode_val = (0x08 & opcode) >> 3;
+				cpu_cc_jp_unsigned(ptr_gb_reg, ptr_gb_reg->flag.c, parse_opcode_val, read_short(gb_memory, pc + 1));
+				break;
 			// PUSH rr
 			case 0xC5: case 0xD5: case 0xE5:
 				parse_opcode_addr = (0x30 & opcode) >> 4;
 				hold_ptr_u16 = (&ptr_gb_reg->bc) + parse_opcode_addr;
 				cpu_stack_push(ptr_gb_reg, gb_memory, (*hold_ptr_u16));
+				break;
+			// PUSH AF
+			case 0xF5:
+				cpu_stack_push(ptr_gb_reg, gb_memory, ptr_gb_reg->af & 0xFFF0);
 				break;
 			// RET
 			case 0xC9:
@@ -460,7 +518,19 @@ int main(int argc, char **argv) {
 				cpu_stack_push(ptr_gb_reg, gb_memory, pc + 3);
 				ptr_gb_reg->pc = read_short(gb_memory, pc + 1);
 				break;
-
+			// JP HL
+			case 0xE9:
+				ptr_gb_reg->pc = ptr_gb_reg->hl;
+				break;
+			// RST nn
+			case 0xC7: case 0xCF:
+			case 0xD7: case 0xDF:
+			case 0xE7: case 0xEF:
+			case 0xF7: case 0xFF:
+				hold_byte = (opcode & 0x38);
+				cpu_stack_push(ptr_gb_reg, gb_memory, pc + 1);
+				ptr_gb_reg->pc = hold_byte;
+				break;
 			// ALU 8-bit
 			// INC reg
 			case 0x04: case 0x0C: case 0x14: case 0x1C: case 0x24: case 0x2C: case 0x3C:
@@ -519,8 +589,45 @@ int main(int argc, char **argv) {
 				parse_opcode_addr = (0x30 & opcode) >> 4;
 				(*ptr_op_reg_u16[parse_opcode_addr])--;
 				break;
+			// ADD SP, r8
+			case 0xE8:
+				hold_byte = read_byte(gb_memory, pc + 1);
+				ptr_gb_reg->flag.h = uint32_t((ptr_gb_reg->sp & 0x0FFF) + ((hold_byte) & 0x0FFF)) > 0x0FFF ? 1 : 0;
+				ptr_gb_reg->flag.c = uint32_t( ptr_gb_reg->sp + (int8_t)(hold_byte) ) > 0xFFFF? 1 : 0;
+				ptr_gb_reg->flag.z = 0;
+				ptr_gb_reg->flag.n = 0;
+				ptr_gb_reg->sp += ((int8_t)hold_byte);
+				break;
 
 			// LOGIC
+			// ADD A, r
+			case 0x80: case 0x81: case 0x82: case 0x83: case 0x84: case 0x85: case 0x87:
+				parse_opcode_addr = (opcode & 0x7);
+				hold_byte = (*ptr_op_reg_u8[parse_opcode_addr]);
+				flag_do_h(ptr_gb_reg, ptr_gb_reg->a, hold_byte, false);
+				ptr_gb_reg->flag.c = ((ptr_gb_reg->a + hold_byte) > 0xFF) ? 1 : 0;
+				ptr_gb_reg->a += hold_byte;
+				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
+				ptr_gb_reg->flag.n = 0;
+				break;
+			// ADD A, (HL)
+			case 0x86:
+				hold_byte = read_byte(gb_memory, ptr_gb_reg->hl);
+				flag_do_h(ptr_gb_reg, ptr_gb_reg->a, hold_byte, false);
+				ptr_gb_reg->flag.c = ((ptr_gb_reg->a + hold_byte) > 0xFF) ? 1 : 0;
+				ptr_gb_reg->a += hold_byte;
+				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
+				ptr_gb_reg->flag.n = 0;
+				break;
+			// ADD A, d8
+			case 0xC6:
+				hold_byte = read_byte(gb_memory, pc + 1);
+				flag_do_h(ptr_gb_reg, ptr_gb_reg->a, hold_byte, false);
+				ptr_gb_reg->flag.c = ((ptr_gb_reg->a + hold_byte) > 0xFF) ? 1 : 0;
+				ptr_gb_reg->a += hold_byte;
+				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
+				ptr_gb_reg->flag.n = 0;
+				break;
 			// ADC A, r
 			case 0x88: case 0x89: case 0x8A: case 0x8B: case 0x8C: case 0x8D: case 0x8F:
 				parse_opcode_addr = (opcode & 0x7);
@@ -531,12 +638,61 @@ int main(int argc, char **argv) {
 				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
 				ptr_gb_reg->flag.n = 0;
 				break;
+			// ADC A, (HL)
+			case 0x8E:
+				hold_byte = read_byte(gb_memory, ptr_gb_reg->hl);
+				flag_do_h(ptr_gb_reg, ptr_gb_reg->a, hold_byte, false);
+				ptr_gb_reg->flag.c = ((ptr_gb_reg->a + hold_byte) > 0xFF) ? 1 : 0;
+				ptr_gb_reg->a += hold_byte;
+				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
+				ptr_gb_reg->flag.n = 0;
+				break;
+			// ADC A, d8
+			case 0xCE:
+				hold_byte = read_byte(gb_memory, pc + 1);
+				flag_do_h(ptr_gb_reg, ptr_gb_reg->a, hold_byte, false);
+				ptr_gb_reg->flag.c = ((ptr_gb_reg->a + hold_byte) > 0xFF) ? 1 : 0;
+				ptr_gb_reg->a += hold_byte;
+				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
+				ptr_gb_reg->flag.n = 0;
+				break;
+			// SUB r
+			case 0x90: case 0x91: case 0x92: case 0x93: case 0x94: case 0x95: case 0x97:
+				parse_opcode_addr = (opcode & 0x7);
+				hold_u8_pre = (*ptr_op_reg_u8[parse_opcode_addr]);
+				hold_u8_post = (ptr_gb_reg->a - hold_u8_pre);
+				ptr_gb_reg->a = hold_u8_post;
+				flag_do_h(ptr_gb_reg, hold_u8_pre, hold_u8_post, true);
+				ptr_gb_reg->flag.c = (hold_u8_pre < hold_u8_post) ? 0 : 1;
+				ptr_gb_reg->flag.z = (hold_u8_post == 0) ? 1 : 0;
+				ptr_gb_reg->flag.n = 1;
+				break;
+			// SUB (HL)
+			case 0x96:
+				hold_u8_pre = read_byte(gb_memory, ptr_gb_reg->hl);
+				hold_u8_post = (ptr_gb_reg->a - hold_u8_pre);
+				ptr_gb_reg->a = hold_u8_post;
+				flag_do_h(ptr_gb_reg, hold_u8_pre, hold_u8_post, true);
+				ptr_gb_reg->flag.c = (hold_u8_pre < hold_u8_post) ? 0 : 1;
+				ptr_gb_reg->flag.z = (hold_u8_post == 0) ? 1 : 0;
+				ptr_gb_reg->flag.n = 1;
+				break;
+			// SUB d8
+			case 0xD6:
+				hold_u8_pre = read_byte(gb_memory, pc + 1);
+				hold_u8_post = (ptr_gb_reg->a - hold_u8_pre);
+				ptr_gb_reg->a = hold_u8_post;
+				flag_do_h(ptr_gb_reg, hold_u8_pre, hold_u8_post, true);
+				ptr_gb_reg->flag.c = (hold_u8_pre < hold_u8_post) ? 0 : 1;
+				ptr_gb_reg->flag.z = (hold_u8_post == 0) ? 1 : 0;
+				ptr_gb_reg->flag.n = 1;
+				break;
 			// SBC A, r
 			case 0x98: case 0x99: case 0x9A: case 0x9B: case 0x9C: case 0x9D: case 0x9F:
 				parse_opcode_addr = (opcode & 0x7);
 				hold_byte = (*ptr_op_reg_u8[parse_opcode_addr]) + ptr_gb_reg->flag.c;
 				flag_do_h(ptr_gb_reg, ptr_gb_reg->a, hold_byte, true);
-				ptr_gb_reg->flag.c = (ptr_gb_reg->a < hold_byte) ? 1 : 0;
+				ptr_gb_reg->flag.c = (ptr_gb_reg->a < hold_byte) ? 0 : 1;
 				ptr_gb_reg->a -= hold_byte;
 				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
 				ptr_gb_reg->flag.n = 1;
@@ -545,7 +701,7 @@ int main(int argc, char **argv) {
 			case 0x9E:
 				hold_byte = read_byte(gb_memory, ptr_gb_reg->hl) + ptr_gb_reg->flag.c;
 				flag_do_h(ptr_gb_reg, ptr_gb_reg->a, hold_byte, true);
-				ptr_gb_reg->flag.c = (ptr_gb_reg->a < hold_byte) ? 1 : 0;
+				ptr_gb_reg->flag.c = (ptr_gb_reg->a < hold_byte) ? 0 : 1;
 				ptr_gb_reg->a -= hold_byte;
 				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
 				ptr_gb_reg->flag.n = 1;
@@ -554,7 +710,7 @@ int main(int argc, char **argv) {
 			case 0xDE:
 				hold_byte = read_byte(gb_memory, pc + 1) + ptr_gb_reg->flag.c;
 				flag_do_h(ptr_gb_reg, ptr_gb_reg->a, hold_byte, true);
-				ptr_gb_reg->flag.c = (ptr_gb_reg->a < hold_byte) ? 1 : 0;
+				ptr_gb_reg->flag.c = (ptr_gb_reg->a < hold_byte) ? 0 : 1;
 				ptr_gb_reg->a -= hold_byte;
 				ptr_gb_reg->flag.z = (ptr_gb_reg->a == 0) ? 1 : 0;
 				ptr_gb_reg->flag.n = 1;
@@ -574,6 +730,38 @@ int main(int argc, char **argv) {
 			case 0xEE:
 				hold_byte = read_byte(gb_memory, pc + 1);
 				cpu_instruction_xor(ptr_gb_reg, hold_byte);
+				break;
+			// AND r
+			case 0xA0: case 0xA1: case 0xA2: case 0xA3: case 0xA4: case 0xA5: case 0xA7:
+				parse_opcode_addr = (opcode & 0x7);
+				hold_byte = (*ptr_op_reg_u8[parse_opcode_addr]);
+				cpu_instruction_and(ptr_gb_reg, hold_byte);
+				break;
+			// AND (HL)
+			case 0xA6:
+				hold_byte = (read_byte(gb_memory, ptr_gb_reg->hl));
+				cpu_instruction_and(ptr_gb_reg, hold_byte);
+				break;
+			// AND d8
+			case 0xE6:
+				hold_byte = (read_byte(gb_memory, pc + 1));
+				cpu_instruction_and(ptr_gb_reg, hold_byte);
+				break;
+			// OR r
+			case 0xB0: case 0xB1: case 0xB2: case 0xB3: case 0xB4: case 0xB5: case 0xB7:
+				parse_opcode_addr = (opcode & 0x7);
+				hold_byte = (*ptr_op_reg_u8[parse_opcode_addr]);
+				cpu_instruction_or(ptr_gb_reg, hold_byte);
+				break;
+			// OR (HL)
+			case 0xB6:
+				hold_byte = (read_byte(gb_memory, ptr_gb_reg->hl));
+				cpu_instruction_or(ptr_gb_reg, hold_byte);
+				break;
+			// OR d8
+			case 0xF6:
+				hold_byte = (read_byte(gb_memory, pc + 1));
+				cpu_instruction_or(ptr_gb_reg, hold_byte);
 				break;
 			// CP r
 			case 0xB8: case 0xB9: case 0xBA: case 0xBB: case 0xBC: case 0xBD: case 0xBF:
@@ -624,23 +812,21 @@ int main(int argc, char **argv) {
 				ptr_gb_reg->flag.n = 0;
 				ptr_gb_reg->flag.h = 0;
 				break;
-			// NOP
-			case 0x00:
-				break;
 			case 0xCB: // PREFIX CB
-				print_step(*ptr_gb_reg, gb_memory, "(CB)");
+				/*print_step(*ptr_gb_reg, gb_memory, "(CB)");
 				pc = ptr_gb_reg->pc;
 				opcode = gb_memory[pc];
 				ptr_gb_reg->pc++;
-				prefix_cb(opcode);
+				prefix_cb(opcode);*/
+				program_stop = 1;
 				break;
 			
 			default:
 				printf("0x%02X: Unknown opcode!\n", opcode);
-				return 1;
-		}
+				program_stop = 1;
+		}	
 	}
-	printf("PROGRAM ENDED\n");
 
+	debugger->dbgEnd(0);
 	return 0;
 }
