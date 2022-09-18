@@ -39,9 +39,9 @@ void write_byte(uint8_t *memory, uint16_t addr, uint8_t value) {
 // flags start
 void flag_do_h(Z80_Register *param_reg, int value_left, int value_right, bool subtraction) {
 	if (subtraction) {
-		param_reg->flag.h = uint8_t((value_left & 0xF) < (value_right & 0xF)) ? 0 : 1;
+		param_reg->flag.h = uint8_t((value_left - value_right) & 0xF0 ) < (value_left & 0xF0) ? 1 : 0;
 	} else {
-		param_reg->flag.h = ( ((value_left & 0xF) + (value_right & 0xF)) > 0x10) ? 1 : 0;
+		param_reg->flag.h = ( ((value_left & 0xF) + (value_right & 0xF)) > 0xF) ? 1 : 0;
 	}
 }
 
@@ -52,7 +52,7 @@ void build_ptr_op_reg_u8(Z80_Register *param_reg, uint8_t *param_ptr_op_reg_u8[8
 	param_ptr_op_reg_u8[3] = &param_reg->e; // 3
 	param_ptr_op_reg_u8[4] = &param_reg->h; // 4
 	param_ptr_op_reg_u8[5] = &param_reg->l; // 5
-	param_ptr_op_reg_u8[6] = gb_memory; // 6
+	param_ptr_op_reg_u8[6] = gb_memory;     // 6
 	param_ptr_op_reg_u8[7] = &param_reg->a; // 7
 }
 void build_ptr_op_reg_u16(Z80_Register *param_reg, uint16_t *param_ptr_op_reg_u16[4]) {
@@ -142,25 +142,25 @@ uint16_t cpu_stack_pop(Z80_Register *param_reg, uint8_t *memory) {
 	hold_u8_post = read_byte(memory, ++param_reg->sp);
 	return ( (hold_u8_post) << 8 ) + (hold_u8_pre);
 }
-void cpu_cc_jp_signed(Z80_Register *param_reg, uint8_t param_flag, uint8_t expected_bit, int8_t signed_byte_value) {
+void cpu_cc_jp_signed(Z80_Register *param_reg, uint16_t param_pc, uint8_t param_flag, uint8_t expected_bit, int8_t signed_byte_value) {
 	if (param_flag == expected_bit) {
-		param_reg->pc += int8_t(signed_byte_value);
+		param_reg->pc = param_pc + int8_t(signed_byte_value);
 	}
 }
-void cpu_cc_jp_unsigned(Z80_Register *param_reg, uint8_t param_flag, uint8_t expected_bit, uint8_t unsigned_byte_value) {
+void cpu_cc_jp_unsigned(Z80_Register *param_reg, uint16_t param_pc, uint8_t param_flag, uint8_t expected_bit, uint8_t unsigned_byte_value) {
 	if (param_flag == expected_bit) {
-		param_reg->pc += uint8_t(unsigned_byte_value);
+		param_reg->pc = param_pc + uint8_t(unsigned_byte_value);
 	}
 }
-void cpu_cc_ret(Z80_Register *param_reg, uint8_t param_flag, uint8_t expected_bit) {
+void cpu_cc_ret(Z80_Register *param_reg, uint16_t param_pc, uint8_t param_flag, uint8_t expected_bit) {
 	if (param_flag == expected_bit) {
-		ptr_gb_reg->pc = cpu_stack_pop(ptr_gb_reg, gb_memory);
+		param_reg->pc = param_pc + cpu_stack_pop(ptr_gb_reg, gb_memory);
 	}
 }
 void cpu_cc_call(Z80_Register *param_reg, uint8_t *param_mem, uint8_t param_flag, uint8_t expected_bit, uint16_t param_pc) {
 	if (param_flag == expected_bit) {
 		cpu_stack_push(param_reg, param_mem, param_pc + 3);
-		ptr_gb_reg->pc = read_short(param_mem, param_pc + 1);
+		param_reg->pc = read_short(param_mem, param_pc + 1);
 	}
 }
 void cpu_instruction_xor(Z80_Register *param_reg, uint8_t param_value) {
@@ -251,16 +251,19 @@ int main(int argc, char **argv) {
 
 	printf("\nPROGRAM START\n");
 	program_stop = false;
+	
 	ptr_gb_reg->pc = 0x0100;
 	ptr_gb_reg->sp = 0xFFFE;
-	ptr_gb_reg->a = 0x01;
-	ptr_gb_reg->b = 0xFF;
-	ptr_gb_reg->c = 0x13;
-	ptr_gb_reg->e = 0xC1;
-	ptr_gb_reg->hl = 0x8403;
-
+	ptr_gb_reg->a = 0x11;
+	ptr_gb_reg->f = 0x80;
+	ptr_gb_reg->b = 0x00;
+	ptr_gb_reg->c = 0x00;
+	ptr_gb_reg->de = 0xFF56;
+	ptr_gb_reg->hl = 0x000D;
+	
 	// debugs
 	debugger = new Debugger(ptr_gb_reg, gb_memory);
+	//debugger->disable();
 	//signal(SIGINT, debugger->dbgEnd(1));
 
 	while (!program_stop) {
@@ -269,7 +272,7 @@ int main(int argc, char **argv) {
 		if (gb_memory[0xff02] == 0x81) {
 			char c = gb_memory[0xff01]; 
 			printf("%c", c); 
-			gb_memory[0xff02] = 0x01;
+			gb_memory[0xff02] = 0x00;
 		}
 
 		pc = ptr_gb_reg->pc;
@@ -396,7 +399,7 @@ int main(int argc, char **argv) {
 				break;
 			// LD (nn), SP
 			case 0x08:
-				hold_addr = read_short(gb_memory, ptr_gb_reg->pc + 1);
+				hold_addr = read_short(gb_memory, pc + 1);
 				write_byte(gb_memory, hold_addr, ptr_gb_reg->sp);
 				break;
 			// LD (HL+), A
@@ -444,27 +447,27 @@ int main(int argc, char **argv) {
 			// JUMPS AND STACKS
 			// JR r8
 			case 0x18:
-				ptr_gb_reg->pc += int8_t(read_byte(gb_memory, pc + 1));
+				ptr_gb_reg->pc = pc + int8_t(read_byte(gb_memory, pc + 1));
 				break;
 			case 0x20: // JP NZ, signed d8 + pc
 			case 0x28: // JP Z, signed d8 + pc
 				parse_opcode_val = ((opcode & 0x08) >> 3);
-				cpu_cc_jp_signed(ptr_gb_reg, ptr_gb_reg->flag.z, parse_opcode_val, int8_t(read_byte(gb_memory, pc + 1)));
+				cpu_cc_jp_signed(ptr_gb_reg, pc + OP_BYTES[opcode], ptr_gb_reg->flag.z, parse_opcode_val, int8_t(read_byte(gb_memory, pc + 1)));
 				break;
 			case 0x30: // JP NC, signed d8 + pc
 			case 0x38: // JP C, signed d8 + pc
 				parse_opcode_val = ((opcode & 0x08) >> 3);
-				cpu_cc_jp_signed(ptr_gb_reg, ptr_gb_reg->flag.c, parse_opcode_val, int8_t(read_byte(gb_memory, pc + 1)));
+				cpu_cc_jp_signed(ptr_gb_reg, pc + OP_BYTES[opcode], ptr_gb_reg->flag.c, parse_opcode_val, int8_t(read_byte(gb_memory, pc + 1)));
 				break;
 			// RET Z FLAG
 			case 0xC0: case 0xC8:
 				parse_opcode_val = ((opcode & 0x08) >> 3);
-				cpu_cc_ret(ptr_gb_reg, ptr_gb_reg->flag.z, parse_opcode_val);
+				cpu_cc_ret(ptr_gb_reg, pc + OP_BYTES[opcode], ptr_gb_reg->flag.z, parse_opcode_val);
 				break;
 			// RET C FLAG
 			case 0xD0: case 0xD8:
 				parse_opcode_val = ((opcode & 0x08) >> 3);
-				cpu_cc_ret(ptr_gb_reg, ptr_gb_reg->flag.c, parse_opcode_val);
+				cpu_cc_ret(ptr_gb_reg, pc + OP_BYTES[opcode], ptr_gb_reg->flag.c, parse_opcode_val);
 				break;
 			// POP rr
 			case 0xC1: case 0xD1: case 0xE1:
@@ -474,11 +477,12 @@ int main(int argc, char **argv) {
 				break;
 			// POP AF
 			case 0xF1:
-				ptr_gb_reg->af = cpu_stack_pop(ptr_gb_reg, gb_memory) & 0xFFF0;	
+				ptr_gb_reg->af = cpu_stack_pop(ptr_gb_reg, gb_memory) & 0xFFF0;
+				break;
 			// JP Z FLAG, a16
 			case 0xC2: case 0xCA:
 				parse_opcode_val = (0x08 & opcode) >> 3;
-				cpu_cc_jp_unsigned(ptr_gb_reg, ptr_gb_reg->flag.z, parse_opcode_val, read_short(gb_memory, pc + 1));
+				cpu_cc_jp_unsigned(ptr_gb_reg, pc + OP_BYTES[opcode], ptr_gb_reg->flag.z, parse_opcode_val, read_short(gb_memory, pc + 1));
 				break;
 			// JP a16
 			case 0xC3:
@@ -497,7 +501,7 @@ int main(int argc, char **argv) {
 			// JP C FLAG, a16
 			case 0xD2: case 0xDA:
 				parse_opcode_val = (0x08 & opcode) >> 3;
-				cpu_cc_jp_unsigned(ptr_gb_reg, ptr_gb_reg->flag.c, parse_opcode_val, read_short(gb_memory, pc + 1));
+				cpu_cc_jp_unsigned(ptr_gb_reg, pc + OP_BYTES[opcode], ptr_gb_reg->flag.c, parse_opcode_val, read_short(gb_memory, pc + 1));
 				break;
 			// PUSH rr
 			case 0xC5: case 0xD5: case 0xE5:
@@ -534,7 +538,7 @@ int main(int argc, char **argv) {
 			// ALU 8-bit
 			// INC reg
 			case 0x04: case 0x0C: case 0x14: case 0x1C: case 0x24: case 0x2C: case 0x3C:
-				parse_opcode_addr = opcode & 0x38 >> 3;
+				parse_opcode_addr = (opcode & 0x38) >> 3;
 				hold_u8_pre = (*ptr_op_reg_u8[parse_opcode_addr])++;
 				hold_u8_post = (*ptr_op_reg_u8[parse_opcode_addr]);
 				ptr_gb_reg->flag.z = (hold_u8_post == 0) ? 1 : 0;
@@ -550,20 +554,20 @@ int main(int argc, char **argv) {
 				flag_do_h(ptr_gb_reg, hold_u8_pre, 1, false);
 				ptr_gb_reg->flag.n = 0;
 				break;
+			// DEC reg
+			case 0x05: case 0x0D: case 0x15: case 0x1D: case 0x25: case 0x2D: case 0x3D:
+				parse_opcode_addr = (0x38 & opcode) >> 3;
+				hold_u8_pre = (*ptr_op_reg_u8[parse_opcode_addr])--;
+				hold_u8_post = (*ptr_op_reg_u8[parse_opcode_addr]);
+				ptr_gb_reg->flag.z = (hold_u8_post == 0) ? 1 : 0;
+				flag_do_h(ptr_gb_reg, hold_u8_pre, 1, true);
+				ptr_gb_reg->flag.n = 1;
+				break;
 			// DEC (HL)
 			case 0x35:
 				hold_u8_pre = read_byte(gb_memory, ptr_gb_reg->hl);
 				hold_u8_post = hold_u8_pre - 1;
 				write_byte(gb_memory, ptr_gb_reg->hl, hold_u8_post);
-				ptr_gb_reg->flag.z = (hold_u8_post == 0) ? 1 : 0;
-				flag_do_h(ptr_gb_reg, hold_u8_pre, 1, true);
-				ptr_gb_reg->flag.n = 1;
-				break;
-			// DEC reg
-			case 0x05: case 0x0D: case 0x15: case 0x1D: case 0x25: case 0x2D: case 0x3D:
-				parse_opcode_addr = (0x30 & opcode) >> 4;
-				hold_u8_pre = (*ptr_op_reg_u8[parse_opcode_addr])--;
-				hold_u8_post = (*ptr_op_reg_u8[parse_opcode_addr]);
 				ptr_gb_reg->flag.z = (hold_u8_post == 0) ? 1 : 0;
 				flag_do_h(ptr_gb_reg, hold_u8_pre, 1, true);
 				ptr_gb_reg->flag.n = 1;

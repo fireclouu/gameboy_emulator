@@ -11,8 +11,9 @@ using namespace std;
 
 class Debugger {
 	private:
-		bool isOpcode = 0, isIterator = 1, printQuiet = 0;
+		bool mainSwitchEnable = 1, isOpcode = 0, isIterator = 1, isPc = 0, printQuiet = 0;
 		uint8_t opcodeVal = 0;
+		uint16_t pcVal = 0;
 		uint64_t iterator = 0, newValueIterator = 0;
 		Z80_Register *addrRegister;
 		uint8_t *addrMemory;
@@ -26,5 +27,6 @@ class Debugger {
 		void print_memory(uint8_t *param_memory, int param_mem_size);
 		void debugStepInteractive();
 		void dbgEnd(int param);
+		void disable();
 };
 #endif // DEBUG_H
