@@ -27,6 +27,4 @@ ___
 
 
 
-> **Note** <br>
-> Expect my codebase to be messy, I'm trying my best to refactor and organize things.
-> I'll do cleanups once I have my own personal computer ready!
+> **Note** Please take note that my codebase will be messy, I'm trying my best to refactor and organize things. Cleanups will follow once I have my own personal computer ready!
