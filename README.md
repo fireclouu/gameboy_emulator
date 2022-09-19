@@ -1,17 +1,32 @@
 <div class="myWrapper" markdown="1">
-<h2><div align="center">Gameboy Emulator</div></h2>
+<h1>
+  <div align="center">
+  <p> :video_game: C/C++ Gameboy Emulator :video_game: </p>  
+  <img src="https://img.shields.io/badge/stability-wip-lightgrey.svg">
+  <img src="https://img.shields.io/github/commit-activity/w/fireclouu/gbemu_v2">
+  <img src="https://img.shields.io/github/last-commit/fireclouu/gbemu_v2"> 
+  </div>
+</h1>
 
-[![stability-wip](https://img.shields.io/badge/stability-wip-lightgrey.svg)](https://github.com/mkenney/software-guides/blob/master/STABILITY-BADGES.md#work-in-progress) ![t](https://badge-size.herokuapp.com/fireclouu/gbemu_v2/main/src/main.cpp)
+### :dart: Overview
+A personal project emulating Gameboy CPU and internals on other systems. :video_game:
+###### :bulb: Using C/C++ for flexible memory management feature.
 
-My restart to making another gameboy emulator.
-### Feature
-Written in C++, using its good advantage of direct memory handling feature
+___
 
-### Status
+### :green_book: Status
 - [ ] Opcodes
 - [ ] Timings
 - [ ] Tests
 - [ ] Display
 - [ ] Sound
 - [ ] Interrupts
+
+
 </div>
+
+
+
+> **Note** <br>
+> Expect my codebase to be messy, I'm trying my best to refactor and organize things.
+> I'll do cleanups once I have my own personal computer ready!
