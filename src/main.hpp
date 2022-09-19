@@ -45,8 +45,8 @@ struct Z80_Register {
 						uint8_t f;
 						struct {
 							uint8_t ZEROFILL:4;
-							uint8_t c:1, h:1, n:1, z:1;
-						} flag;
+							uint8_t flag_c:1, flag_h:1, flag_n:1, flag_z:1;
+						};
 					};
 					uint8_t a;
 				};
