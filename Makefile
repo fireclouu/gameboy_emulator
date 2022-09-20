@@ -1,5 +1,6 @@
 CC := g++
-CFLAGS := -Wall -g
+INCLUDE := include/
+CFLAGS := -Wall -g -I $(INCLUDE)
 EXE := gbemuv2
 TEST_EXE := gbemuv2_memtest
 SRC_DIR := src
