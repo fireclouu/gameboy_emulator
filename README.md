@@ -15,7 +15,7 @@ A personal project emulating Gameboy CPU and internals on other systems. :video_
 ___
 
 ### :green_book: Status
-- [ ] Opcodes
+- [x] Opcodes (some opcodes failing)
 - [ ] Timings
 - [ ] Tests
 - [ ] Display
