@@ -125,13 +125,13 @@ int main(int argc, char **argv) {
       printf("%c", c);
       gb_memory[0xff02] = 0x00;
     }
-    //debug->startDebug();
+    // debug->startDebug();
     pc = cpu->cpuRegister.pc;
     opcode = gb_memory[pc];
     cpu->cpuRegister.pc += OP_BYTES[opcode];
     prghalt =  cpu->decode(pc, opcode);
   }
-    //debug->endDebug();
+    // debug->endDebug();
   printf("\n-----\nPROGRAM END\n");
   return 0;
 }

@@ -36,7 +36,7 @@ class Debug {
           uint8_t pc:1, opcode:1, ffwd:1, step:1, next:1, iterate:1;
       };
   } break_n;
-  uint8_t storeOpcode;
+  uint16_t storeOpcode;
   uint64_t storeIterate, storeFfwd;
   uint16_t storePc;
       uint64_t iterate = 0;

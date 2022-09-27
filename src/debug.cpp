@@ -46,8 +46,10 @@ void Debug::print() {
       OP_INSTRUCTION[mmu->readByte(cpu->cpuRegister.pc)]);
   printf("MEMORY       STACK:\n");
   for (int x = 0; x < 4; x++) {
-    if (pc + x < 0xFFFF) printf("[%04X: %02X]   ", pc + x, mmu->readByte(pc + x));
-    if (sp + x < 0xFFFF) printf("[%04X: %02X]   ", sp + x, mmu->readByte(sp + x));
+    if (pc + x < 0xFFFF)
+      printf("[%04X: %02X]   ", pc + x, mmu->readByte(pc + x));
+    if (sp + x < 0xFFFF)
+      printf("[%04X: %02X]   ", sp + x, mmu->readByte(sp + x));
     printf("\n");
   }
 }
@@ -59,6 +61,7 @@ void Debug::interact() {
   convert = x + 1;
   opt = x[0];
 
+  std::stringstream ss;
   switch (opt) {
     case 'f':
       if (!(x[1] == '\0')) {
@@ -70,19 +73,18 @@ void Debug::interact() {
     case 'c':
       break_n.breakCode = 0;
       break;
-    case 'o':
+    case 'o': {
       if (!(x[1] == '\0')) {
         break_n.breakCode = 0;
         break_n.opcode = 1;
-        std::stringstream ss;
         ss << std::hex << convert;
         ss >> storeOpcode;
       }
+    } break;
     case 'p':
       if (!(x[1] == '\0')) {
         break_n.breakCode = 0;
         break_n.pc = 1;
-        std::stringstream ss;
         ss << std::hex << convert;
         ss >> storePc;
       }
@@ -97,6 +99,7 @@ void Debug::interact() {
         break_n.next = 1;
         storeFfwd = 1;
       }
+      break;
     case 'g':
       if (!(x[1] == '\0')) {
         break_n.breakCode = 0;
@@ -109,7 +112,7 @@ void Debug::startDebug() {
   uint8_t opcode = mmu->readByte(cpu->cpuRegister.pc);
   opcodeTally[opcode]++;
   if (opcode == 0xCB) {
-    uint8_t opcodeCb = mmu->readByte(opcode + 1);
+    uint8_t opcodeCb = mmu->readByte(cpu->cpuRegister.pc + 1);
     opcodeTallyCb[opcodeCb]++;
   }
   // forward, opc, pc
