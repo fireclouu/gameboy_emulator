@@ -18,7 +18,7 @@ ___
 ### :green_book: Status
 - [x] Opcodes (some opcodes failing)
 - [ ] Timings
-- [ ] Tests (2 of 11 blaarg test passing)
+- [ ] Tests (3 of 11 blaarg test passing)
 - [ ] Display
 - [ ] Sound
 - [ ] Interrupts
