@@ -1,4 +1,5 @@
-/* debug.cpp
+/*
+ * debug.cpp
  * Copyright (C) 2022 fireclouu
  *
  * This program is free software: you can redistribute it and/or modify
@@ -16,142 +17,124 @@
  */
 
 #include "include/debug.hpp"
-#include "include/main.hpp"
+
+#include <cstdint>
+#include <istream>
+#include <sstream>
+#include <string>
+
 #include "include/opcode.hpp"
 
-Debugger::Debugger(GB_Register*param_reg, uint8_t*memory) {
-  addrRegister = param_reg;
-  addrMemory = memory;
-  newValueIterator = 0;
-  isIterator = 1;
+Debug::Debug(Cpu *cpu, Mmu *mmu) {
+  storeOpcode = storeIterate = storeFfwd = storePc = 0;
+  debugDisable = false;
+  this->cpu = cpu;
+  this->mmu = mmu;
+  break_n.breakCode = 0xFF;  // temporary break
 }
-void Debugger::debugStepInteractive() {
-  op_used[addrMemory[addrRegister->pc]]++;
-  if (!printQuiet)
-    debugPrintStep("");
-  if (((addrMemory[addrRegister->pc] == opcodeVal) && isOpcode) ||
-      (iterator >= newValueIterator && isIterator) ||
-      (isPc && addrRegister->pc == pcVal)) {
-    debugInteract();
-  }
-  iterator++;
-}
-void Debugger::dbgEnd(int param) {
-  if (!mainSwitchEnable)
-    return;
-  printf("\nOPCODE TALLY: (%lu iterations)\n", iterator);
-  for (int a = 0; a < 0xFF; a++) {
-    if (op_used[a] == 0)
-      continue;
-    printf("0x%02X (%s):  %ld\n", a, OP_INSTRUCTION[a], op_used[a]);
-  }
-  printf("PROGRAM ENDED\n");
-  exit(param);
-}
-void Debugger::debugInteract() {
-  if (!mainSwitchEnable)
-    return;
-  int inputSize = 100;
-  char input[100];
-  std::stringstream ss;
-  std::string inputToInt;
 
-  for (int x = 0; x < inputSize; x++) {
-    input[x] = '\0';
-  }
-
-  printf("Enter argument:\n");
-  std::cin.getline(input, inputSize);
-  printf("\n");
-  uint64_t convertedValue;
-  // convert to int
-  inputToInt = (input + 1);
-  if (input[0] == '\0')
-    return;
-  switch (input[0]) {
-  case 'o':
-    ss << std::hex << inputToInt;
-    ss >> convertedValue;
-    opcodeVal = convertedValue;
-    isOpcode = true;
-    isPc = false;
-    isIterator = false;
-    printQuiet = false;
-    break;
-  case 'i':
-    convertedValue = input[1] != '\0' ? stoul(inputToInt) : 1;
-    newValueIterator = iterator + convertedValue;
-    isIterator = true;
-    isOpcode = false;
-    isPc = false;
-    printQuiet = false;
-    break;
-  case 'f':
-  case '\0':
-    convertedValue = input[1] != '\0' ? stoul(inputToInt) : 1;
-    newValueIterator = iterator + convertedValue;
-    isIterator = true;
-    isOpcode = false;
-    isPc = false;
-    printQuiet = true;
-    break;
-  case 'c':
-    isIterator = isOpcode = isPc = false;
-    printQuiet = true;
-    break;
-  case 'b':
-    ss << std::hex << inputToInt;
-    ss >> convertedValue;
-    isPc = true;
-    isIterator = isOpcode = false;
-    pcVal = convertedValue;
-    break;
-  case 'q':
-    exit(0);
-    break;
-  default:
-    debugInteract();
-  }
-}
-void Debugger::debugPrintStep(const std::string msg) {
-  if (!mainSwitchEnable)
-    return;
-  printf("PC: %04X (0x%02X)  AF: %04X  BC: %04X  DE: %04X  HL: %04X  SP: %04X  "
-         "%s\n",
-         addrRegister->pc, addrMemory[addrRegister->pc],
-     addrRegister->reg_pair_af,
-         addrRegister->reg_pair_bc,
-     addrRegister->reg_pair_de,
-     addrRegister->reg_pair_hl,
-     addrRegister->sp,
-         msg.c_str());
-  printf("ITER: %lu INST: %s\n", iterator,
-         OP_INSTRUCTION[addrMemory[addrRegister->pc]]);
-  printf("MEMORY and STACK:\n");
+void Debug::print() {
+  int pc = cpu->cpuRegister.pc;
+  int sp = cpu->cpuRegister.sp;
+  printf("ITER: %lu\n", iterate);
+  printf(
+      "PC: %04X (%02X)  SP: %04X  BC: %04X  DE: %04X  HL: %04X  AF: %04X   "
+      "%s\n",
+      pc, mmu->readByte(pc), cpu->cpuRegister.sp, cpu->cpuRegister.reg_pair_bc,
+      cpu->cpuRegister.reg_pair_de, cpu->cpuRegister.reg_pair_hl,
+      cpu->cpuRegister.reg_pair_af,
+      OP_INSTRUCTION[mmu->readByte(cpu->cpuRegister.pc)]);
+  printf("MEMORY       STACK:\n");
   for (int x = 0; x < 4; x++) {
-    int hold_pc = addrRegister->pc + x;
-    int hold_sp = addrRegister->sp + x;
-    if (hold_pc <= 0xFFFF) {
-      printf("[ 0x%04X: 0x%02X ]   ", hold_pc, addrMemory[hold_pc]);
-    }
-    if (hold_sp <= 0xFFFF) {
-      printf("[ 0x%04X: 0x%02X ]", hold_sp, addrMemory[hold_sp]);
-    }
+    if (pc + x < 0xFFFF) printf("[%04X: %02X]   ", pc + x, mmu->readByte(pc + x));
+    if (sp + x < 0xFFFF) printf("[%04X: %02X]   ", sp + x, mmu->readByte(sp + x));
     printf("\n");
   }
-  printf("\n");
 }
-void Debugger::print_memory(uint8_t*param_memory, int param_mem_size) {
-  if (!mainSwitchEnable)
-    return;
-  for (int x = 0; x < param_mem_size; x++) {
-    printf("%04X: 0x%02X   ", x, param_memory[x]);
-    if (((x + 1) % 4) == 0)
-      printf("\n");
+void Debug::interact() {
+  std::string convert;
+  char x[100];
+  char opt;
+  std::cin.getline(x, 100);
+  convert = x + 1;
+  opt = x[0];
+
+  switch (opt) {
+    case 'f':
+      if (!(x[1] == '\0')) {
+        break_n.breakCode = 0;
+        break_n.ffwd = 1;
+        storeFfwd = iterate + std::stoul(convert);
+      }
+      break;
+    case 'c':
+      break_n.breakCode = 0;
+      break;
+    case 'o':
+      if (!(x[1] == '\0')) {
+        break_n.breakCode = 0;
+        break_n.opcode = 1;
+        std::stringstream ss;
+        ss << std::hex << convert;
+        ss >> storeOpcode;
+      }
+    case 'p':
+      if (!(x[1] == '\0')) {
+        break_n.breakCode = 0;
+        break_n.pc = 1;
+        std::stringstream ss;
+        ss << std::hex << convert;
+        ss >> storePc;
+      }
+      break;
+    case 'n':
+      if (!(x[1] == '\0')) {
+        break_n.breakCode = 0;
+        break_n.next = 1;
+        storeFfwd = iterate + std::stoul(convert);
+      } else {
+        break_n.breakCode = 0;
+        break_n.next = 1;
+        storeFfwd = 1;
+      }
+    case 'g':
+      if (!(x[1] == '\0')) {
+        break_n.breakCode = 0;
+        break_n.step = 1;
+      }
+      break;
   }
 }
-
-void Debugger::disable() {
-  mainSwitchEnable = 0;
-  isOpcode = isIterator = 0;
+void Debug::startDebug() {
+  uint8_t opcode = mmu->readByte(cpu->cpuRegister.pc);
+  opcodeTally[opcode]++;
+  if (opcode == 0xCB) {
+    uint8_t opcodeCb = mmu->readByte(opcode + 1);
+    opcodeTallyCb[opcodeCb]++;
+  }
+  // forward, opc, pc
+  if ((break_n.ffwd && storeFfwd < iterate) ||
+      (break_n.opcode && opcode == storeOpcode) ||
+      (break_n.pc && storePc == cpu->cpuRegister.pc) ||
+      (break_n.next && storeFfwd < iterate) || (break_n.step)) {
+    print();
+    interact();
+  }
+  iterate++;
+}
+void Debug::endDebug() {
+  printf("Program ended with %lu iterations!\n", iterate);
+  printf("All used opcodes:\n");
+  printf("Opcodes:\n");
+  for (int a = 0; a < 0xFF; a++) {
+    uint64_t tmp = opcodeTally[a];
+    if (tmp) printf("%02X: %lu\n", a, tmp);
+  }
+  printf("-----------\n");
+  printf("CB Opcodes:\n");
+  for (int a = 0; a < 0xFF; a++) {
+    uint64_t tmp = opcodeTallyCb[a];
+    if (tmp) printf("%02X: %lu\n", a, tmp);
+  }
+  printf("debug end.");
 }

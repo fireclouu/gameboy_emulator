@@ -1,5 +1,5 @@
 /*
-│* main.hpp
+│* mmu.hpp
 │* Copyright (C) 2022 fireclouu
 │*
 │* This program is free software: you can redistribute it and/or modify
@@ -16,30 +16,25 @@
 │* along with this program. If not, see <http://www.gnu.org/licenses/>.
 │*/
 
-#ifndef SRC_INCLUDE_MAIN_HPP_
-#define SRC_INCLUDE_MAIN_HPP_
-#define TITLE "GBEMU_V2"
-#include <fstream>
+#ifndef SRC_INCLUDE_MMU_HPP_
+#define SRC_INCLUDE_MMU_HPP_
+#include <stdint.h>
 #include <iostream>
-#include <string>
 
-struct GB_Register {
-  union {
-    uint8_t all_reg[8];
-    struct {
-      uint8_t reg_b, reg_c, reg_d, reg_e, reg_h, reg_l;
-      union {
-        uint8_t reg_f;
-        struct {
-          uint8_t ZEROFILL : 4;
-          uint8_t flag_c : 1, flag_h : 1, flag_n : 1, flag_z : 1;
-        };
-      };
-      uint8_t reg_a;
-    };
-  };
-  uint16_t sp;
-  uint16_t pc;
+class Mmu {
+ private:
+  uint8_t *memoryMap;
+  int romSize;
+  bool* halt;
+
+ public:
+  explicit Mmu(uint8_t* memoryMap, int romSize, bool* haltPtr);
+  ~Mmu();
+  void getMemoryMap(uint8_t* memoryMap, int romSize);
+  void writeByte(uint16_t addr, uint8_t value);
+  uint8_t readByte(uint16_t addr);
+  uint16_t readShort(uint16_t addr);
+  uint8_t* getBytePtr(uint16_t addr);
 };
 
-#endif  // SRC_INCLUDE_MAIN_HPP_
+#endif  // SRC_INCLUDE_MMU_HPP_
