@@ -18,23 +18,36 @@
 
 #ifndef SRC_INCLUDE_MMU_HPP_
 #define SRC_INCLUDE_MMU_HPP_
-#include <stdint.h>
+
 #include <iostream>
+#include <cstdint>
+#define ROM_SIZE   0x8000
+#define VRAM_SIZE  0x2000
+#define ERAM_SIZE  0x2000
+#define WRAM_SIZE  0x2000
+#define OAM_SIZE   0x00A0
+#define IOMAP_SIZE 0x0080
+#define HRAM_SIZE  0x007F
 
 class Mmu {
  private:
-  uint8_t *memoryMap;
-  int romSize;
-  bool* halt;
+  uint32_t *currentTCycle;
+  uint8_t rom[ROM_SIZE] = {};
+  uint8_t vram[VRAM_SIZE] = {};
+  uint8_t eram[ERAM_SIZE] = {};
+  uint8_t wram[WRAM_SIZE] = {};
+  uint8_t oam[OAM_SIZE] = {};
+  uint8_t iomap[IOMAP_SIZE] = {};
+  uint8_t hram[HRAM_SIZE] = {};
 
  public:
-  explicit Mmu(uint8_t* memoryMap, int romSize, bool* haltPtr);
+  Mmu();
   ~Mmu();
-  void getMemoryMap(uint8_t* memoryMap, int romSize);
   void writeByte(uint16_t addr, uint8_t value);
   uint8_t readByte(uint16_t addr);
   uint16_t readShort(uint16_t addr);
-  uint8_t* getBytePtr(uint16_t addr);
+  void setCurrentTCycle(uint32_t *currentTCycle);
+  void setRom(uint8_t romData[ROM_SIZE]);
 };
 
 #endif  // SRC_INCLUDE_MMU_HPP_

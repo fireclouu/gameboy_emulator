@@ -1,5 +1,5 @@
 /*
-│* main.hpp
+│* cpu.hpp
 │* Copyright (C) 2022 fireclouu
 │*
 │* This program is free software: you can redistribute it and/or modify
@@ -19,8 +19,7 @@
 #ifndef SRC_INCLUDE_CPU_HPP_
 #define SRC_INCLUDE_CPU_HPP_
 #define TITLE "GBEMU_V2"
-
-#include <stdint.h>
+#include <cstdint>
 #include "mmu.hpp"
 
 struct CpuRegister {
@@ -62,38 +61,41 @@ struct CpuRegister {
   };
   uint16_t sp;
   uint16_t pc;
-  uint8_t *reg[8] = {&reg_b, &reg_c, &reg_d,  &reg_e,
+  uint8_t* reg[8] = {&reg_b, &reg_c, &reg_d,  &reg_e,
                      &reg_h, &reg_l, nullptr, &reg_a};
-  uint16_t *reg_pair[4] = {&reg_pair_bc, &reg_pair_de, &reg_pair_hl,
-                           &sp};
+  uint16_t* reg_pair[4] = {&reg_pair_bc, &reg_pair_de, &reg_pair_hl, &sp};
 };
 
 class Cpu {
  private:
-  Mmu *mmu;
+  Mmu* mmu;
 
  public:
+  uint32_t currentTCycle;
+  bool* halt;
   struct CpuRegister cpuRegister = {};
-  explicit Cpu(Mmu *mmu);
+  Cpu();
   ~Cpu();
   void checkFlagH(uint8_t left, uint8_t right, bool isSubtraction);
   int decode(uint16_t opcodeAddr, uint8_t opcode);
   int decodeCb(uint16_t opcodeAddr, uint8_t opcode);
   void instructionStackPush(uint16_t addr_value);
   uint16_t instructionStackPop();
+  void instructionRet();
+  void instructionCall(uint16_t pc);
   void instructionAnd(uint8_t value);
   void instructionXor(uint8_t value);
   void instructionOr(uint8_t value);
   void instructionCp(uint8_t value);
   void instructionAdd(uint8_t value);
   void instructionSub(uint8_t value);
-  void instructionInc(uint8_t* bytePtr);
-  void instructionDec(uint8_t* bytePtr);
+  uint8_t instructionInc(uint8_t regAddrValue);
+  uint8_t instructionDec(uint8_t regAddrValue);
   void conditionalJpAdd(uint8_t flag, uint8_t expected, int8_t value);
-  void conditionalJpAdd(uint8_t flag, uint8_t expected, uint8_t value);
   void conditionalJpA16(uint8_t flag, uint8_t expected, uint16_t value);
   void conditionalRet(uint8_t flag, uint8_t expected);
   void conditionalCall(uint16_t pc, uint8_t flag, uint8_t expected);
-  bool programStop;
+  void setMmu(Mmu *mmu);
+  void setHalt(bool *halt);
 };
 #endif  // SRC_INCLUDE_CPU_HPP_

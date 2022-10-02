@@ -22,24 +22,9 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-
-struct GB_Register {
-  union {
-    uint8_t all_reg[8];
-    struct {
-      uint8_t reg_b, reg_c, reg_d, reg_e, reg_h, reg_l;
-      union {
-        uint8_t reg_f;
-        struct {
-          uint8_t ZEROFILL : 4;
-          uint8_t flag_c : 1, flag_h : 1, flag_n : 1, flag_z : 1;
-        };
-      };
-      uint8_t reg_a;
-    };
-  };
-  uint16_t sp;
-  uint16_t pc;
-};
+#include "cpu.hpp"
+#include "host.hpp"
+#include "mmu.hpp"
+#include "opcode.hpp"
 
 #endif  // SRC_INCLUDE_MAIN_HPP_

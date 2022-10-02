@@ -18,6 +18,7 @@
 
 #include "include/debug.hpp"
 
+#include <csignal>
 #include <cstdint>
 #include <istream>
 #include <sstream>
@@ -36,13 +37,12 @@ Debug::Debug(Cpu *cpu, Mmu *mmu) {
 void Debug::print() {
   int pc = cpu->cpuRegister.pc;
   int sp = cpu->cpuRegister.sp;
-  printf("ITER: %lu\n", iterate);
+  printf("ITER: %lu  CYC: %u\n", iterate, cpu->currentTCycle);
   printf(
-      "PC: %04X (%02X)  SP: %04X  BC: %04X  DE: %04X  HL: %04X  AF: %04X   "
-      "%s\n",
-      pc, mmu->readByte(pc), cpu->cpuRegister.sp, cpu->cpuRegister.reg_pair_bc,
-      cpu->cpuRegister.reg_pair_de, cpu->cpuRegister.reg_pair_hl,
-      cpu->cpuRegister.reg_pair_af,
+      "PC: %04X (%02X)  SP: %04X\nAF: %04X  BC: %04X  DE: %04X  HL: %04X  %s\n",
+      pc, mmu->readByte(pc), cpu->cpuRegister.sp, cpu->cpuRegister.reg_pair_af,
+      cpu->cpuRegister.reg_pair_bc, cpu->cpuRegister.reg_pair_de,
+      cpu->cpuRegister.reg_pair_hl,
       OP_INSTRUCTION[mmu->readByte(cpu->cpuRegister.pc)]);
   printf("MEMORY       STACK:\n");
   for (int x = 0; x < 4; x++) {
@@ -51,6 +51,21 @@ void Debug::print() {
     if (sp + x < 0xFFFF)
       printf("[%04X: %02X]   ", sp + x, mmu->readByte(sp + x));
     printf("\n");
+  }
+}
+void Debug::endDebug() {
+  printf("Program ended with %lu iterations!\n", iterate);
+  printf("All used opcodes:\n");
+  printf("Opcodes:\n");
+  for (int a = 0; a < 0xFF; a++) {
+    uint64_t tmp = opcodeTally[a];
+    if (tmp) printf("%02X: %lu\n", a, tmp);
+  }
+  printf("-----------\n");
+  printf("CB Opcodes:\n");
+  for (int a = 0; a < 0xFF; a++) {
+    uint64_t tmp = opcodeTallyCb[a];
+    if (tmp) printf("%02X: %lu\n", a, tmp);
   }
 }
 void Debug::interact() {
@@ -124,20 +139,4 @@ void Debug::startDebug() {
     interact();
   }
   iterate++;
-}
-void Debug::endDebug() {
-  printf("Program ended with %lu iterations!\n", iterate);
-  printf("All used opcodes:\n");
-  printf("Opcodes:\n");
-  for (int a = 0; a < 0xFF; a++) {
-    uint64_t tmp = opcodeTally[a];
-    if (tmp) printf("%02X: %lu\n", a, tmp);
-  }
-  printf("-----------\n");
-  printf("CB Opcodes:\n");
-  for (int a = 0; a < 0xFF; a++) {
-    uint64_t tmp = opcodeTallyCb[a];
-    if (tmp) printf("%02X: %lu\n", a, tmp);
-  }
-  printf("debug end.");
 }

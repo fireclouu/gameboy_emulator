@@ -20,19 +20,24 @@
 
 #include <stdint.h>
 
+#include <cstdint>
+
 #include "include/opcode.hpp"
 
-Cpu::Cpu(Mmu *mmu) {
-  this->mmu = mmu;
-  programStop = false;
+Cpu::Cpu() {
+  currentTCycle = 0;
+}
+void Cpu::setMmu(Mmu *mmu) {
+    this->mmu = mmu;
+}
+void Cpu::setHalt(bool *halt) {
+    this->halt = halt;
 }
 void Cpu::checkFlagH(uint8_t left, uint8_t right, bool isSubtraction) {
   if (isSubtraction) {
-    //  cpuRegister.flag_h = uint8_t((left & 0x0F) - (right & 0x0F) & 0xF0) <
-    //  (left & 0xF0) ? 1 : 0;
-    cpuRegister.flag_h = ((left & 0x0F) < (right & 0x0F)) ? 0 : 1;
+    cpuRegister.flag_h = ((left & 0x0F) < (right & 0x0F)) ? 1 : 0;
   } else {
-    cpuRegister.flag_h = (((left & 0xF) + (right & 0xF)) > 0xF) ? 1 : 0;
+    cpuRegister.flag_h = (((left & 0x0F) + (right & 0x0F)) > 0x0F) ? 1 : 0;
   }
 }
 void Cpu::instructionStackPush(uint16_t addrValue) {
@@ -40,55 +45,65 @@ void Cpu::instructionStackPush(uint16_t addrValue) {
   uint8_t msb = (addrValue & 0xFF00) >> 8;
   mmu->writeByte(cpuRegister.sp--, msb);
   mmu->writeByte(cpuRegister.sp--, lsb);
+  currentTCycle += 4;
 }
 uint16_t Cpu::instructionStackPop() {
   uint8_t lsb = mmu->readByte(++cpuRegister.sp);
   uint8_t msb = mmu->readByte(++cpuRegister.sp);
   return ((msb) << 8) + (lsb);
 }
+void Cpu::instructionRet() {
+  cpuRegister.pc = instructionStackPop();
+  currentTCycle += 4;
+}
 void Cpu::conditionalJpAdd(uint8_t flag, uint8_t expected, int8_t value) {
-  if (flag == expected) cpuRegister.pc += (value);
+  if (flag == expected) {
+    cpuRegister.pc += (value);
+    currentTCycle += 4;
+  }
 }
-/*
-void Cpu::conditionalJpAdd(uint8_t flag, uint8_t expected, uint8_t value) {
-  if (flag == expected) cpuRegister.pc += uint8_t(value);
-}
-*/
 void Cpu::conditionalJpA16(uint8_t flag, uint8_t expected, uint16_t value) {
-  if (flag == expected) cpuRegister.pc = value;
+  if (flag == expected) {
+    cpuRegister.pc = value;
+    currentTCycle += 4;
+  }
 }
 void Cpu::conditionalRet(uint8_t flag, uint8_t expected) {
-  if (flag == expected) cpuRegister.pc = instructionStackPop();
+  if (flag == expected) {
+    instructionRet();
+  }
+  currentTCycle += 4;
 }
 void Cpu::conditionalCall(uint16_t pc, uint8_t flag, uint8_t expected) {
+  uint16_t nextWord = mmu->readShort(pc + 1);
   if (flag == expected) {
     instructionStackPush(pc + 3);
-    cpuRegister.pc = mmu->readShort(pc + 1);
+    cpuRegister.pc = nextWord;
   }
 }
 void Cpu::instructionAnd(uint8_t value) {
   cpuRegister.reg_a &= value;
-  cpuRegister.flag_z = !(cpuRegister.reg_a) ? 1 : 0;
+  cpuRegister.flag_z = (cpuRegister.reg_a == 0);
   cpuRegister.flag_n = 0;
   cpuRegister.flag_h = 1;
   cpuRegister.flag_c = 0;
 }
 void Cpu::instructionXor(uint8_t value) {
   cpuRegister.reg_a ^= value;
-  cpuRegister.flag_z = !(cpuRegister.reg_a) ? 1 : 0;
+  cpuRegister.flag_z = (cpuRegister.reg_a == 0);
   cpuRegister.flag_n = 0;
   cpuRegister.flag_h = 0;
   cpuRegister.flag_c = 0;
 }
 void Cpu::instructionOr(uint8_t value) {
   cpuRegister.reg_a |= value;
-  cpuRegister.flag_z = !(cpuRegister.reg_a) ? 1 : 0;
+  cpuRegister.flag_z = (cpuRegister.reg_a == 0);
   cpuRegister.flag_n = 0;
   cpuRegister.flag_h = 0;
   cpuRegister.flag_c = 0;
 }
 void Cpu::instructionCp(uint8_t value) {
-  cpuRegister.flag_z = (cpuRegister.reg_a == value) ? 1 : 0;
+  cpuRegister.flag_z = (cpuRegister.reg_a == value);
   cpuRegister.flag_n = 1;
   checkFlagH(cpuRegister.reg_a, value, true);
   cpuRegister.flag_c = (cpuRegister.reg_a < value) ? 1 : 0;
@@ -97,44 +112,46 @@ void Cpu::instructionAdd(uint8_t value) {
   uint8_t accumulator = cpuRegister.reg_a;
   cpuRegister.reg_a += value;
 
-  cpuRegister.flag_z = !(cpuRegister.reg_a) ? 1 : 0;
+  cpuRegister.flag_z = (cpuRegister.reg_a == 0);
   cpuRegister.flag_n = 0;
   checkFlagH(accumulator, value, false);
-  cpuRegister.flag_c = (uint16_t(accumulator + value) > 0xFF) ? 1 : 0;
+  cpuRegister.flag_c = ((accumulator + value) > 0xFF) ? 1 : 0;
 }
 void Cpu::instructionSub(uint8_t value) {
   uint8_t accumulator = cpuRegister.reg_a;
   cpuRegister.reg_a -= value;
 
-  cpuRegister.flag_z = !(cpuRegister.reg_a) ? 1 : 0;
+  cpuRegister.flag_z = (cpuRegister.reg_a == 0);
   checkFlagH(accumulator, value, true);
   cpuRegister.flag_n = 1;
   cpuRegister.flag_c = (accumulator < value) ? 0 : 1;
 }
-void Cpu::instructionInc(uint8_t *bytePtr) {
-  uint8_t valueBytePre = (*bytePtr)++;
-  uint8_t valueBytePost = (*bytePtr);
-  cpuRegister.flag_z = (valueBytePost == 0) ? 1 : 0;
+uint8_t Cpu::instructionInc(uint8_t regAddrValue) {
+  uint8_t valueBytePre = regAddrValue;
+  uint8_t valueBytePost = regAddrValue + 1;
+  cpuRegister.flag_z = (valueBytePost == 0);
   checkFlagH(valueBytePre, 1, false);
   cpuRegister.flag_n = 0;
+
+  return valueBytePost;
 }
-void Cpu::instructionDec(uint8_t *bytePtr) {
-  uint8_t valueBytePre = (*bytePtr)--;
-  uint8_t valueBytePost = (*bytePtr);
-  cpuRegister.flag_z = (valueBytePost == 0) ? 1 : 0;
+uint8_t Cpu::instructionDec(uint8_t regAddrValue) {
+  uint8_t valueBytePre = regAddrValue;
+  uint8_t valueBytePost = regAddrValue - 1;
+  cpuRegister.flag_z = (valueBytePost == 0);
   checkFlagH(valueBytePre, 1, true);
   cpuRegister.flag_n = 1;
+  return valueBytePost;
 }
 int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
-  int returnCode = 0;
-  uint8_t holdBit, holdByte;
+  currentTCycle = 0;
   uint16_t parseAddr;
   uint16_t parseAddrL, parseAddrR;
   uint16_t *holdAddrPtr;
 
   uint16_t currentPc = opcodeAddr;
   uint8_t currentOpcode = opcode;
-
+  currentTCycle += 4;
   switch (currentOpcode) {
     // ILLEGAL
     case 0xD3:
@@ -161,41 +178,41 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       break;
     // ROTATES AND SHIFTS
     // RLCA
-    case 0x07:
-      holdBit = ((cpuRegister.reg_a & 0x80) >> 7);
-      cpuRegister.reg_a = (cpuRegister.reg_a << 1) + holdBit;
+    case 0x07: {
+      uint8_t bit = ((cpuRegister.reg_a & 0x80) >> 7);
+      cpuRegister.reg_a = (cpuRegister.reg_a << 1) + bit;
       cpuRegister.flag_z = 0;
       cpuRegister.flag_h = 0;
       cpuRegister.flag_n = 0;
-      cpuRegister.flag_c = holdBit;
-      break;
+      cpuRegister.flag_c = bit;
+    } break;
     // RLA
-    case 0x17:
-      holdBit = (cpuRegister.reg_a & 0x80) >> 7;
+    case 0x17: {
+      uint8_t bit = ((cpuRegister.reg_a & 0x80) >> 7);
       cpuRegister.reg_a = (cpuRegister.reg_a << 1) + cpuRegister.flag_c;
       cpuRegister.flag_z = 0;
       cpuRegister.flag_h = 0;
       cpuRegister.flag_n = 0;
-      cpuRegister.flag_c = holdBit;
-      break;
+      cpuRegister.flag_c = bit;
+    } break;
     // RRCA
-    case 0x0F:
-      holdBit = (cpuRegister.reg_a & 1);
-      cpuRegister.reg_a = (holdBit << 7) + (cpuRegister.reg_a >> 1);
+    case 0x0F: {
+      uint8_t bit = (cpuRegister.reg_a & 1);
+      cpuRegister.reg_a = (bit << 7) + (cpuRegister.reg_a >> 1);
       cpuRegister.flag_z = 0;
       cpuRegister.flag_h = 0;
       cpuRegister.flag_n = 0;
-      cpuRegister.flag_c = holdBit;
-      break;
+      cpuRegister.flag_c = bit;
+    } break;
     // RRA
-    case 0x1F:
-      holdBit = (cpuRegister.reg_a & 1);
+    case 0x1F: {
+      uint8_t bit = (cpuRegister.reg_a & 1);
       cpuRegister.reg_a = (cpuRegister.flag_c << 7) + (cpuRegister.reg_a >> 1);
       cpuRegister.flag_z = 0;
       cpuRegister.flag_h = 0;
       cpuRegister.flag_n = 0;
-      cpuRegister.flag_c = holdBit;
-      break;
+      cpuRegister.flag_c = bit;
+    } break;
 
     // LOADS 8-bit
     // LD (reg, no HL), d8
@@ -285,11 +302,11 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     case 0x5E:
     case 0x66:
     case 0x6E:
-    case 0x7E:
-      parseAddr = (currentOpcode & 0x38) >> 3;
-      holdByte = mmu->readByte(cpuRegister.reg_pair_hl);
-      (*cpuRegister.reg[parseAddr]) = holdByte;
-      break;
+    case 0x7E: {
+      uint8_t parseRegister = (currentOpcode & 0x38) >> 3;
+      uint8_t value = mmu->readByte(cpuRegister.reg_pair_hl);
+      (*cpuRegister.reg[parseRegister]) = value;
+    } break;
     // LDH (a8), A
     case 0xE0:
       parseAddr = 0xFF00 + mmu->readByte(currentPc + 1);
@@ -342,10 +359,10 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       mmu->writeByte(cpuRegister.reg_pair_hl--, cpuRegister.reg_a);
       break;
     // LD (HL), d8
-    case 0x36:
-      holdByte = mmu->readByte(currentPc + 1);
-      mmu->writeByte(cpuRegister.reg_pair_hl, holdByte);
-      break;
+    case 0x36: {
+      uint8_t nextByte = mmu->readByte(currentPc + 1);
+      mmu->writeByte(cpuRegister.reg_pair_hl, nextByte);
+    } break;
     // LD (HL), reg
     case 0x70:
     case 0x71:
@@ -358,25 +375,22 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       mmu->writeByte(cpuRegister.reg_pair_hl, (*cpuRegister.reg[parseAddr]));
       break;
     // LD HL, SP+r8
-    // todo
     case 0xF8: {
       uint16_t sp = cpuRegister.sp;
       int8_t nextByte = mmu->readByte(currentPc + 1);
-      cpuRegister.reg_pair_hl = (sp + nextByte);
+      uint16_t result = sp + nextByte;
+      cpuRegister.reg_pair_hl = result;
+      currentTCycle += 4;
 
       cpuRegister.flag_z = 0;
       cpuRegister.flag_n = 0;
-      /*
-      cpuRegister.flag_h =
-          uint16_t((sp & 0x0FFF) + (nextByte & 0x0FFF)) > 0x0FFF ? 1 : 0;
-      cpuRegister.flag_c = uint32_t(sp + nextByte) > 0xFFFF ? 1 : 0;
-      */
-      cpuRegister.flag_h = uint16_t((sp & 0x0FFF) + nextByte) > 0x0FFF ? 1 : 0;
-      cpuRegister.flag_c = uint64_t(sp + nextByte) > 0xFFFF ? 1 : 0;
+      cpuRegister.flag_h = ((sp & 0x0F) + (nextByte & 0x0F) > 0x0F) ? 1 : 0;
+      cpuRegister.flag_c = ((result & 0xFF) < (sp & 0xFF)) ? 1 : 0;
     } break;
     // LD SP, HL
     case 0xF9:
       cpuRegister.sp = cpuRegister.reg_pair_hl;
+      currentTCycle += 4;
       break;
     // LD (a16), A
     case 0xEA:
@@ -391,36 +405,41 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
 
     // JUMPS AND STACKS
     // JR r8
-    case 0x18:
-      cpuRegister.pc += int8_t(mmu->readByte(currentPc + 1));
-      break;
-      // JP NZ, signed d8 + pc
+    case 0x18: {
+      int8_t nextByte = mmu->readByte(currentPc + 1);
+      conditionalJpAdd(1, 1, nextByte);
+    } break;
+      // JP NZ, r8
     case 0x20:
-      // JP Z, signed d8 + pc
-    case 0x28:
-      holdBit = ((currentOpcode & 0x08) >> 3);
-      conditionalJpAdd(cpuRegister.flag_z, holdBit,
-                       int8_t(mmu->readByte(currentPc + 1)));
-      break;
+      // JP Z, r8
+    case 0x28: {
+      uint8_t bit = ((currentOpcode & 0x08) >> 3);
+      int8_t nextByte = mmu->readByte(currentPc + 1);
+      conditionalJpAdd(cpuRegister.flag_z, bit, nextByte);
+    } break;
       // JP NC, signed d8 + pc
     case 0x30:
       // JP C, signed d8 + pc
-    case 0x38:
-      holdBit = ((currentOpcode & 0x08) >> 3);
-      conditionalJpAdd(cpuRegister.flag_c, holdBit,
-                       int8_t(mmu->readByte(currentPc + 1)));
-      break;
+    case 0x38: {
+      uint8_t bit = ((currentOpcode & 0x08) >> 3);
+      int8_t nextByte = mmu->readByte(currentPc + 1);
+      conditionalJpAdd(cpuRegister.flag_c, bit, nextByte);
+    } break;
     // RET Z FLAG
     case 0xC0:
-    case 0xC8:
-      holdBit = ((currentOpcode & 0x08) >> 3);
-      conditionalRet(cpuRegister.flag_z, holdBit);
-      break;
+    case 0xC8: {
+      uint8_t bit = ((currentOpcode & 0x08) >> 3);
+      conditionalRet(cpuRegister.flag_z, bit);
+    } break;
     // RET C FLAG
     case 0xD0:
-    case 0xD8:
-      holdBit = ((currentOpcode & 0x08) >> 3);
-      conditionalRet(cpuRegister.flag_c, holdBit);
+    case 0xD8: {
+      uint8_t bit = ((currentOpcode & 0x08) >> 3);
+      conditionalRet(cpuRegister.flag_c, bit);
+    } break;
+    // RETI
+    case 0xD9:
+      instructionRet();
       break;
     // POP rr
     case 0xC1:
@@ -435,34 +454,35 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       break;
     // JP Z FLAG, a16
     case 0xC2:
-    case 0xCA:
-      holdBit = (0x08 & currentOpcode) >> 3;
-      conditionalJpA16(cpuRegister.flag_z, holdBit,
-                       mmu->readShort(currentPc + 1));
-      break;
+    case 0xCA: {
+      uint8_t bit = (currentOpcode & 0x08) >> 3;
+      uint16_t nextWord = mmu->readShort(currentPc + 1);
+      conditionalJpA16(cpuRegister.flag_z, bit, nextWord);
+    } break;
     // JP a16
-    case 0xC3:
-      cpuRegister.pc = mmu->readShort(currentPc + 1);
-      break;
+    case 0xC3: {
+      uint16_t nextWord = mmu->readShort(currentPc + 1);
+      conditionalJpA16(1, 1, nextWord);
+    } break;
     // CALL Z FLAG
     case 0xC4:
-    case 0xCC:
-      holdBit = (0x08 & currentOpcode) >> 3;
-      conditionalCall(currentPc, cpuRegister.flag_z, holdBit);
-      break;
+    case 0xCC: {
+      uint8_t bit = (currentOpcode & 0x08) >> 3;
+      conditionalCall(currentPc, cpuRegister.flag_z, bit);
+    } break;
     // CALL C FLAG
     case 0xD4:
-    case 0xDC:
-      holdBit = (0x08 & currentOpcode) >> 3;
-      conditionalCall(currentPc, cpuRegister.flag_c, holdBit);
-      break;
+    case 0xDC: {
+      uint8_t bit = (currentOpcode & 0x08) >> 3;
+      conditionalCall(currentPc, cpuRegister.flag_c, bit);
+    } break;
     // JP C FLAG, a16
     case 0xD2:
-    case 0xDA:
-      holdBit = (0x08 & currentOpcode) >> 3;
-      conditionalJpA16(cpuRegister.flag_c, holdBit,
-                       mmu->readShort(currentPc + 1));
-      break;
+    case 0xDA: {
+      uint8_t bit = (currentOpcode & 0x08) >> 3;
+      uint16_t nextWord = mmu->readShort(currentPc + 1);
+      conditionalJpA16(cpuRegister.flag_c, bit, nextWord);
+    } break;
     // PUSH rr
     case 0xC5:
     case 0xD5:
@@ -476,7 +496,7 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       break;
     // RET
     case 0xC9:
-      cpuRegister.pc = instructionStackPop();
+      instructionRet();
       break;
     // CALL
     case 0xCD:
@@ -494,11 +514,11 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     case 0xE7:
     case 0xEF:
     case 0xF7:
-    case 0xFF:
-      holdByte = (currentOpcode & 0x38);
+    case 0xFF: {
+      uint8_t rstAddr = (currentOpcode & 0x38);
       instructionStackPush(currentPc + 1);
-      cpuRegister.pc = holdByte;
-      break;
+      cpuRegister.pc = rstAddr;
+    } break;
     // ALU 8-bit
     // INC reg
     case 0x04:
@@ -509,13 +529,16 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     case 0x2C:
     case 0x3C:
       parseAddr = (currentOpcode & 0x38) >> 3;
-      instructionInc(cpuRegister.reg[parseAddr]);
+      (*cpuRegister.reg[parseAddr]) =
+          instructionInc((*cpuRegister.reg[parseAddr]));
       break;
     // INC (HL)
-    case 0x34:
-      // todo
-      instructionInc(mmu->getBytePtr(cpuRegister.reg_pair_hl));
-      break;
+    case 0x34: {
+      uint16_t hlAddress = cpuRegister.reg_pair_hl;
+      uint8_t value = instructionInc(mmu->readByte(hlAddress));
+      mmu->writeByte(hlAddress, value);
+      currentTCycle += 4;
+    } break;
     // DEC reg
     case 0x05:
     case 0x0D:
@@ -525,13 +548,16 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     case 0x2D:
     case 0x3D:
       parseAddr = (currentOpcode & 0x38) >> 3;
-      instructionDec(cpuRegister.reg[parseAddr]);
+      (*cpuRegister.reg[parseAddr]) =
+          instructionDec((*cpuRegister.reg[parseAddr]));
       break;
     // DEC (HL)
-    case 0x35:
-      // todo
-      instructionDec(mmu->getBytePtr(cpuRegister.reg_pair_hl));
-      break;
+    case 0x35: {
+      uint16_t hlAddress = cpuRegister.reg_pair_hl;
+      uint8_t value = instructionDec(mmu->readByte(hlAddress));
+      mmu->writeByte(hlAddress, value);
+      currentTCycle += 4;
+    } break;
 
     // ALU 16-bit
     // INC rr
@@ -541,6 +567,7 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     case 0x33:
       parseAddr = (currentOpcode & 0x30) >> 4;
       (*cpuRegister.reg_pair[parseAddr])++;
+      currentTCycle += 4;
       break;
     // ADD HL, rr
     case 0x09:
@@ -551,13 +578,13 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       uint16_t *addrPtr = cpuRegister.reg_pair[parsePairAddr];
       uint16_t addrVal = (*addrPtr);
       uint16_t hl = cpuRegister.reg_pair_hl;
-
-      cpuRegister.reg_pair_hl += (*addrPtr);
+      cpuRegister.reg_pair_hl += (addrVal);
 
       cpuRegister.flag_n = 0;
       cpuRegister.flag_h =
-          uint16_t((hl & 0x0FFF) + ((addrVal)&0x0FFF)) > 0x0FFF ? 1 : 0;
-      cpuRegister.flag_c = uint64_t(hl + (addrVal)) > 0xFFFF ? 1 : 0;
+          ((hl & 0x0FFF) + ((addrVal)&0x0FFF)) > 0x0FFF ? 1 : 0;
+      cpuRegister.flag_c = (hl + (addrVal)) > 0xFFFF ? 1 : 0;
+      currentTCycle += 4;
     } break;
     // DEC rr
     case 0x0B:
@@ -566,17 +593,20 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     case 0x3B:
       parseAddr = (0x30 & currentOpcode) >> 4;
       (*cpuRegister.reg_pair[parseAddr])--;
+      currentTCycle += 4;
       break;
     // ADD SP, r8
     case 0xE8: {
       uint16_t sp = cpuRegister.sp;
       int8_t nextByte = mmu->readByte(currentPc + 1);
-      cpuRegister.sp += nextByte;
+      uint16_t result = sp + nextByte;
+      cpuRegister.sp = result;
+      currentTCycle += 8;
 
       cpuRegister.flag_z = 0;
       cpuRegister.flag_n = 0;
-      cpuRegister.flag_h = uint16_t((sp & 0x0FFF) + nextByte) > 0x0FFF ? 1 : 0;
-      cpuRegister.flag_c = uint64_t(sp + nextByte) > 0xFFFF ? 1 : 0;
+      cpuRegister.flag_h = (((sp & 0x0F) + (nextByte & 0x0F)) > 0x0F) ? 1 : 0;
+      cpuRegister.flag_c = ((result & 0xFF) < (sp & 0xFF)) ? 1 : 0;
     } break;
 
     // LOGIC
@@ -603,24 +633,25 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     // ADD A, d8
     case 0xC6:
     // ADC A, d8
-    case 0xCE:
-      holdBit = ((currentOpcode & 0x08) >> 3) ? cpuRegister.flag_c : 0;
+    case 0xCE: {
+      uint8_t value;
+      uint8_t bit = ((currentOpcode & 0x08) >> 3) ? cpuRegister.flag_c : 0;
       switch (currentOpcode) {
         case 0x86:
         case 0x8E:
-          holdByte = mmu->readByte(cpuRegister.reg_pair_hl);
+          value = mmu->readByte(cpuRegister.reg_pair_hl);
           break;
         case 0xC6:
         case 0xCE:
-          holdByte = mmu->readByte(currentPc + 1);
+          value = mmu->readByte(currentPc + 1);
           break;
         default:
           parseAddr = (currentOpcode & 0x07);
-          holdByte = (*cpuRegister.reg[parseAddr]);
+          value = (*cpuRegister.reg[parseAddr]);
       }
-      holdByte += holdBit;
-      instructionAdd(holdByte);
-      break;
+      value += bit;
+      instructionAdd(value);
+    } break;
     // SUB r
     case 0x90:
     case 0x91:
@@ -644,24 +675,25 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     // SUB d8
     case 0xD6:
     // SBC A, d8
-    case 0xDE:
-      holdBit = ((currentOpcode & 0x08) >> 3) ? cpuRegister.flag_c : 0;
+    case 0xDE: {
+      uint8_t value;
+      uint8_t bit = ((currentOpcode & 0x08) >> 3) ? cpuRegister.flag_c : 0;
       switch (currentOpcode) {
         case 0x96:
         case 0x9E:
-          holdByte = mmu->readByte(cpuRegister.reg_pair_hl);
+          value = mmu->readByte(cpuRegister.reg_pair_hl);
           break;
         case 0xD6:
         case 0xDE:
-          holdByte = mmu->readByte(currentPc + 1);
+          value = mmu->readByte(currentPc + 1);
           break;
         default:
           parseAddr = (currentOpcode & 0x07);
-          holdByte = (*cpuRegister.reg[parseAddr]);
+          value = (*cpuRegister.reg[parseAddr]);
       }
-      holdByte += holdBit;
-      instructionSub(holdByte);
-      break;
+      value += bit;
+      instructionSub(value);
+    } break;
     // AND r
     case 0xA0:
     case 0xA1:
@@ -693,25 +725,25 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     case 0xBB:
     case 0xBC:
     case 0xBD:
-    case 0xBF:
+    case 0xBF: {
       parseAddr = (currentOpcode & 0x07);
-      holdBit = (currentOpcode & 0x18) >> 3;
-      holdByte = (*cpuRegister.reg[parseAddr]);
-      switch (holdBit) {
+      uint8_t parseInst = (currentOpcode & 0x18) >> 3;
+      uint8_t value = (*cpuRegister.reg[parseAddr]);
+      switch (parseInst) {
         case 0:
-          instructionAnd(holdByte);
+          instructionAnd(value);
           break;
         case 1:
-          instructionXor(holdByte);
+          instructionXor(value);
           break;
         case 2:
-          instructionOr(holdByte);
+          instructionOr(value);
           break;
         case 3:
-          instructionCp(holdByte);
+          instructionCp(value);
           break;
       }
-      break;
+    } break;
     // AND (HL)
     case 0xA6:
     // XOR (HL)
@@ -744,24 +776,24 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     // OR d8
     case 0xF6:
     // CP d8
-    case 0xFE:
-      holdBit = (currentOpcode & 0x18) >> 3;
-      holdByte = mmu->readByte(currentPc + 1);
-      switch (holdBit) {
+    case 0xFE: {
+      uint8_t parseInst = (currentOpcode & 0x18) >> 3;
+      uint8_t value = mmu->readByte(currentPc + 1);
+      switch (parseInst) {
         case 0:
-          instructionAnd(holdByte);
+          instructionAnd(value);
           break;
         case 1:
-          instructionXor(holdByte);
+          instructionXor(value);
           break;
         case 2:
-          instructionOr(holdByte);
+          instructionOr(value);
           break;
         case 3:
-          instructionCp(holdByte);
+          instructionCp(value);
           break;
       }
-      break;
+    } break;
     // SCF
     case 0x37:
       cpuRegister.flag_n = 0;
@@ -775,47 +807,45 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       uint8_t adjust = 0;
       if (((!cpuRegister.flag_n) && (accumulator & 0x0F) > 0x09) ||
           cpuRegister.flag_h) {
-          adjust |= 0x06;
+        adjust |= 0x06;
       }
       if ((!cpuRegister.flag_n && (accumulator > 0x99)) || cpuRegister.flag_c) {
-          adjust |= 0x60;
-          cpuRegister.flag_c = 1;
+        adjust |= 0x60;
+        cpuRegister.flag_c = 1;
       }
       accumulator += cpuRegister.flag_n ? -adjust : adjust;
 
       cpuRegister.reg_a = accumulator;
       cpuRegister.flag_z = !(cpuRegister.reg_a) ? 1 : 0;
       cpuRegister.flag_h = 0;
+    } break;
+    // CPL
+    case 0x2F:
+      cpuRegister.reg_a = ~cpuRegister.reg_a;
+      cpuRegister.flag_n = 1;
+      cpuRegister.flag_h = 1;
+      break;
+    // CCF
+    case 0x3F:
+      cpuRegister.flag_n = 0;
+      cpuRegister.flag_h = 0;
+      cpuRegister.flag_c = (cpuRegister.flag_c) ? 0 : 1;
+      break;
+    // Prefix CB
+    case 0xCB:
+      cpuRegister.pc++;
+      currentOpcode = mmu->readByte(currentPc + 1);
+      decodeCb(currentPc + 1, currentOpcode);
+      break;
+    default:
+      printf("\n0x%02X: Unknown opcode!\n", currentOpcode);
+      *halt = true;
   }
-  break;
-  // CPL
-  case 0x2F:
-    cpuRegister.reg_a = ~cpuRegister.reg_a;
-    cpuRegister.flag_n = 1;
-    cpuRegister.flag_h = 1;
-    break;
-  // CCF
-  case 0x3F:
-    cpuRegister.flag_n = 0;
-    cpuRegister.flag_h = 0;
-    cpuRegister.flag_c = (cpuRegister.flag_c) ? 0 : 1;
-    break;
-  // Prefix CB
-  case 0xCB:
-    cpuRegister.pc++;
-    currentOpcode = mmu->readByte(currentPc + 1);
-    returnCode = decodeCb(currentPc + 1, currentOpcode);
-    break;
-  default:
-    printf("\n0x%02X: Unknown opcode!\n", currentOpcode);
-    returnCode = 1;
-    programStop = true;
-}
-return returnCode;
+  return currentTCycle;
 }
 
 int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
-  int returnCode = 0;
+  int tick = 0;
   uint8_t parseOpcodeAddr;
   uint8_t holdBit, holdByte;
   uint8_t *holdRegPtr;
@@ -823,6 +853,7 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
   parseOpcodeAddr = (opcode & 0x07);
   holdRegPtr = (cpuRegister.reg[parseOpcodeAddr]);
 
+  currentTCycle += 4;
   switch (opcode) {
     // RLC r
     case 0x00:
@@ -922,8 +953,8 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
     case 0x34:
     case 0x35:
     case 0x37: {
-      int msb = ((*holdRegPtr) & 0xF0) >> 4;
-      int lsb = (*holdRegPtr) & 0x0F;
+      uint8_t msb = ((*holdRegPtr) & 0xF0) >> 4;
+      uint8_t lsb = (*holdRegPtr) & 0x0F;
       (*holdRegPtr) = (lsb << 4) + msb;
       cpuRegister.flag_z = !(*holdRegPtr) ? 1 : 0;
       cpuRegister.flag_n = 0;
@@ -1140,6 +1171,7 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_h = 0;
       cpuRegister.flag_n = 0;
       cpuRegister.flag_c = holdBit;
+      currentTCycle += 4;
       break;
     // RRC
     case 0x0E:
@@ -1152,6 +1184,8 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_h = 0;
       cpuRegister.flag_n = 0;
       cpuRegister.flag_c = holdBit;
+      currentTCycle += 4;
+      break;
     // RL
     case 0x16:
       holdMemoryValueHl = mmu->readByte(cpuRegister.reg_pair_hl);
@@ -1163,6 +1197,7 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_n = 0;
       cpuRegister.flag_h = 0;
       cpuRegister.flag_c = holdBit;
+      currentTCycle += 4;
       break;
     // RR
     case 0x1E:
@@ -1175,6 +1210,7 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_h = 0;
       cpuRegister.flag_n = 0;
       cpuRegister.flag_c = holdBit;
+      currentTCycle += 4;
       break;
     // SLA
     case 0x26:
@@ -1187,6 +1223,7 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_h = 0;
       cpuRegister.flag_n = 0;
       cpuRegister.flag_c = holdBit;
+      currentTCycle += 4;
       break;
     // SRA
     case 0x2E:
@@ -1199,6 +1236,7 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_z = ((holdMemoryValueHl) == 0) ? 1 : 0;
       cpuRegister.flag_h = 0;
       cpuRegister.flag_n = 0;
+      currentTCycle += 4;
       break;
     // SWAP
     case 0x36:
@@ -1211,6 +1249,7 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_n = 0;
       cpuRegister.flag_h = 0;
       cpuRegister.flag_c = 0;
+      currentTCycle += 4;
       break;
     // SRL n
     case 0x3E:
@@ -1223,6 +1262,7 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_h = 0;
       cpuRegister.flag_n = 0;
       cpuRegister.flag_c = holdBit;
+      currentTCycle += 4;
       break;
     // BIT v, HL
     case 0x46:
@@ -1238,6 +1278,7 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_z = ((holdMemoryValueHl & holdMask) == 0) ? 1 : 0;
       cpuRegister.flag_n = 0;
       cpuRegister.flag_h = 1;
+      currentTCycle += 4;
       break;
     // RES v, HL
     case 0x86:
@@ -1265,11 +1306,12 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode) {
         mmu->writeByte(cpuRegister.reg_pair_hl, holdMemoryValueHl | holdMask);
       } else {
         mmu->writeByte(cpuRegister.reg_pair_hl, holdMemoryValueHl & holdMask);
+        currentTCycle += 4;
       }
       break;
     default:
       printf("0x%02X: Unknown CB opcode!\n", opcode);
-      programStop = true;
+      *halt = true;
   }
-  return returnCode;
+  return tick;
 }

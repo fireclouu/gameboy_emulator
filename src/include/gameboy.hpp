@@ -1,5 +1,5 @@
 /*
-│* debug.hpp
+│* gameboy.hpp
 │* Copyright (C) 2022 fireclouu
 │*
 │* This program is free software: you can redistribute it and/or modify
@@ -16,36 +16,22 @@
 │* along with this program. If not, see <http://www.gnu.org/licenses/>.
 │*/
 
-#ifndef SRC_INCLUDE_DEBUG_HPP_
-#define SRC_INCLUDE_DEBUG_HPP_
+#ifndef SRC_INCLUDE_GAMEBOY_HPP_
+#define SRC_INCLUDE_GAMEBOY_HPP_
 #include <cstdint>
-#include <csignal>
-#include <iostream>
 
 #include "cpu.hpp"
 #include "mmu.hpp"
 
-class Debug {
+#define ROM_SIZE 0x8000
+
+class Gameboy {
  public:
-  Cpu *cpu;
-  Mmu *mmu;
-  union {
-      uint8_t breakCode;
-      struct {
-          uint8_t pc:1, opcode:1, ffwd:1, step:1, next:1, iterate:1;
-      };
-  } break_n;
-  uint16_t storeOpcode;
-  uint64_t storeIterate, storeFfwd;
-  uint16_t storePc;
-  uint64_t iterate;
-  uint64_t opcodeTally[0xFF];
-  uint64_t opcodeTallyCb[0xFF];
-  int debugDisable;
-  explicit Debug(Cpu *cpu, Mmu *mmu);
-  void print();
-  void interact();
-  void startDebug();
-  void endDebug();
+  bool halt;
+  uint8_t romData[ROM_SIZE] = {};
+  Gameboy();
+  ~Gameboy();
+  void setup(Cpu *cpu, Mmu *mmu);
 };
-#endif  // SRC_INCLUDE_DEBUG_HPP_
+
+#endif  // SRC_INCLUDE_GAMEBOY_HPP_

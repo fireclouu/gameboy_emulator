@@ -1,5 +1,5 @@
 /*
-│* debug.hpp
+│* host.hpp
 │* Copyright (C) 2022 fireclouu
 │*
 │* This program is free software: you can redistribute it and/or modify
@@ -16,36 +16,30 @@
 │* along with this program. If not, see <http://www.gnu.org/licenses/>.
 │*/
 
-#ifndef SRC_INCLUDE_DEBUG_HPP_
-#define SRC_INCLUDE_DEBUG_HPP_
-#include <cstdint>
-#include <csignal>
+#ifndef SRC_INCLUDE_HOST_HPP_
+#define SRC_INCLUDE_HOST_HPP_
+#include <fstream>
 #include <iostream>
+#include <string>
+#include <cstdint>
+#include "gameboy.hpp"
 
-#include "cpu.hpp"
-#include "mmu.hpp"
+class Host {
+ private:
+  bool fileExist(std::string filePath);
+  char **argv;
+  char *filePath;
+  int fileSize;
+  int argc;
+  Gameboy *gameboy;
+  void handleUserArgument();
+  void readFileContents(std::string filePath);
+  int getFileSize(std::string filePath);
 
-class Debug {
  public:
-  Cpu *cpu;
-  Mmu *mmu;
-  union {
-      uint8_t breakCode;
-      struct {
-          uint8_t pc:1, opcode:1, ffwd:1, step:1, next:1, iterate:1;
-      };
-  } break_n;
-  uint16_t storeOpcode;
-  uint64_t storeIterate, storeFfwd;
-  uint16_t storePc;
-  uint64_t iterate;
-  uint64_t opcodeTally[0xFF];
-  uint64_t opcodeTallyCb[0xFF];
-  int debugDisable;
-  explicit Debug(Cpu *cpu, Mmu *mmu);
-  void print();
-  void interact();
-  void startDebug();
-  void endDebug();
+  explicit Host(int argc, char **argv, Gameboy *gameboy);
+  void loadFile(std::string filePath);
+  void loadFileOnArgument();
 };
-#endif  // SRC_INCLUDE_DEBUG_HPP_
+
+#endif  // SRC_INCLUDE_HOST_HPP_
