@@ -35,9 +35,9 @@ void Cpu::setHalt(bool *halt) {
 }
 void Cpu::checkFlagH(uint8_t left, uint8_t right, bool isSubtraction) {
   if (isSubtraction) {
-    cpuRegister.flag_h = ((left & 0x0F) < (right & 0x0F)) ? 1 : 0;
+    cpuRegister.flag_h = uint8_t((left & 0x0F) - (right & 0x0F)) > (left & 0x0F);
   } else {
-    cpuRegister.flag_h = (((left & 0x0F) + (right & 0x0F)) > 0x0F) ? 1 : 0;
+    cpuRegister.flag_h = (((left & 0x0F) + (right & 0x0F)) > 0x0F);
   }
 }
 void Cpu::instructionStackPush(uint16_t addrValue) {
@@ -115,7 +115,7 @@ void Cpu::instructionAdd(uint8_t value) {
   cpuRegister.flag_z = (cpuRegister.reg_a == 0);
   cpuRegister.flag_n = 0;
   checkFlagH(accumulator, value, false);
-  cpuRegister.flag_c = ((accumulator + value) > 0xFF) ? 1 : 0;
+  cpuRegister.flag_c = ((accumulator + value) > 0xFF);
 }
 void Cpu::instructionSub(uint8_t value) {
   uint8_t accumulator = cpuRegister.reg_a;
@@ -124,7 +124,7 @@ void Cpu::instructionSub(uint8_t value) {
   cpuRegister.flag_z = (cpuRegister.reg_a == 0);
   checkFlagH(accumulator, value, true);
   cpuRegister.flag_n = 1;
-  cpuRegister.flag_c = (accumulator < value) ? 0 : 1;
+  cpuRegister.flag_c = (accumulator < value);
 }
 uint8_t Cpu::instructionInc(uint8_t regAddrValue) {
   uint8_t valueBytePre = regAddrValue;
@@ -235,11 +235,13 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       break;
     // LD A, HL+
     case 0x2A:
-      cpuRegister.reg_a = mmu->readByte(cpuRegister.reg_pair_hl++);
+      cpuRegister.reg_a = mmu->readByte(cpuRegister.reg_pair_hl);
+      cpuRegister.reg_pair_hl++;
       break;
     // LD A, HL-
     case 0x3A:
-      cpuRegister.reg_a = mmu->readByte(cpuRegister.reg_pair_hl--);
+      cpuRegister.reg_a = mmu->readByte(cpuRegister.reg_pair_hl);
+      cpuRegister.reg_pair_hl--;
       break;
     // LD (reg, no HL), (reg, no HL)
     case 0x40:
@@ -406,7 +408,7 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     // JUMPS AND STACKS
     // JR r8
     case 0x18: {
-      int8_t nextByte = mmu->readByte(currentPc + 1);
+      int8_t nextByte = int8_t(mmu->readByte(currentPc + 1));
       conditionalJpAdd(1, 1, nextByte);
     } break;
       // JP NZ, r8
@@ -414,15 +416,15 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       // JP Z, r8
     case 0x28: {
       uint8_t bit = ((currentOpcode & 0x08) >> 3);
-      int8_t nextByte = mmu->readByte(currentPc + 1);
+      int8_t nextByte = int8_t(mmu->readByte(currentPc + 1));
       conditionalJpAdd(cpuRegister.flag_z, bit, nextByte);
     } break;
-      // JP NC, signed d8 + pc
+      // JP NC, r8
     case 0x30:
-      // JP C, signed d8 + pc
+      // JP C, r8
     case 0x38: {
       uint8_t bit = ((currentOpcode & 0x08) >> 3);
-      int8_t nextByte = mmu->readByte(currentPc + 1);
+      int8_t nextByte = int8_t(mmu->readByte(currentPc + 1));
       conditionalJpAdd(cpuRegister.flag_c, bit, nextByte);
     } break;
     // RET Z FLAG
@@ -582,8 +584,8 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
 
       cpuRegister.flag_n = 0;
       cpuRegister.flag_h =
-          ((hl & 0x0FFF) + ((addrVal)&0x0FFF)) > 0x0FFF ? 1 : 0;
-      cpuRegister.flag_c = (hl + (addrVal)) > 0xFFFF ? 1 : 0;
+          ((hl & 0x0FFF) + ((addrVal)&0x0FFF)) > 0x0FFF;
+      cpuRegister.flag_c = uint16_t(hl + (addrVal)) < hl;
       currentTCycle += 4;
     } break;
     // DEC rr

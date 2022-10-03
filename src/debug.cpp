@@ -54,19 +54,30 @@ void Debug::print() {
   }
 }
 void Debug::endDebug() {
+  int usedOpcodes = 0;
   printf("Program ended with %lu iterations!\n", iterate);
   printf("All used opcodes:\n");
   printf("Opcodes:\n");
   for (int a = 0; a < 0xFF; a++) {
     uint64_t tmp = opcodeTally[a];
-    if (tmp) printf("%02X: %lu\n", a, tmp);
+    if (tmp) {
+      printf("%02X: %lu\n", a, tmp);
+      usedOpcodes++;
+    }
   }
+  printf("(%03d used)\n", usedOpcodes);
   printf("-----------\n");
+  usedOpcodes = 0;
   printf("CB Opcodes:\n");
   for (int a = 0; a < 0xFF; a++) {
     uint64_t tmp = opcodeTallyCb[a];
-    if (tmp) printf("%02X: %lu\n", a, tmp);
+    if (tmp) {
+      printf("%02X: %lu\n", a, tmp);
+      usedOpcodes++;
+    }
   }
+  printf("(%03d used)\n", usedOpcodes);
+  printf("-----------\n");
 }
 void Debug::interact() {
   std::string convert;
