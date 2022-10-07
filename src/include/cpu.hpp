@@ -88,6 +88,8 @@ class Cpu {
   void instructionOr(uint8_t value);
   void instructionCp(uint8_t value);
   void instructionAdd(uint8_t value);
+  void instructionAdc(uint8_t value);
+  void instructionSbc(uint8_t value);
   void instructionSub(uint8_t value);
   uint8_t instructionInc(uint8_t regAddrValue);
   uint8_t instructionDec(uint8_t regAddrValue);
