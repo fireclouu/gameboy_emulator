@@ -18,22 +18,24 @@
 
 #ifndef SRC_INCLUDE_DEBUG_HPP_
 #define SRC_INCLUDE_DEBUG_HPP_
-#include <cstdint>
 #include <csignal>
+#include <cstdint>
 #include <iostream>
 
 #include "cpu.hpp"
 #include "mmu.hpp"
+#include "gameboy.hpp"
 
 class Debug {
  public:
+  Gameboy *gameboy;
   Cpu *cpu;
   Mmu *mmu;
   union {
-      uint8_t breakCode;
-      struct {
-          uint8_t pc:1, opcode:1, ffwd:1, step:1, next:1, iterate:1;
-      };
+    uint8_t breakCode;
+    struct {
+      uint8_t pc : 1, opcode : 1, ffwd : 1, step : 1, next : 1, iterate : 1;
+    };
   } break_n;
   uint16_t storeOpcode;
   uint64_t storeIterate, storeFfwd;
@@ -42,7 +44,7 @@ class Debug {
   uint64_t opcodeTally[0xFF];
   uint64_t opcodeTallyCb[0xFF];
   int debugDisable;
-  explicit Debug(Cpu *cpu, Mmu *mmu);
+  explicit Debug(Gameboy *gameboy, Cpu *cpu, Mmu *mmu);
   void print();
   void interact();
   void startDebug();

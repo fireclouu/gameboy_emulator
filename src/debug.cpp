@@ -20,15 +20,19 @@
 
 #include <csignal>
 #include <cstdint>
+#include <cstdio>
 #include <istream>
 #include <sstream>
 #include <string>
+#include <iostream>
+#include <fstream>
 
 #include "include/opcode.hpp"
 
-Debug::Debug(Cpu *cpu, Mmu *mmu) {
+Debug::Debug(Gameboy *gameboy, Cpu *cpu, Mmu *mmu) {
   storeOpcode = storeIterate = storeFfwd = storePc = 0;
   debugDisable = false;
+  this->gameboy = gameboy;
   this->cpu = cpu;
   this->mmu = mmu;
   break_n.breakCode = 0xFF;  // temporary break
@@ -132,6 +136,16 @@ void Debug::interact() {
         break_n.step = 1;
       }
       break;
+    case 'd': {
+        std::ofstream stream("dump");
+        if (stream.is_open()) {
+            for (int x = 0; x < 0xFFFF; x++) {
+                stream << gameboy->romData[x];
+            }
+        }
+        printf("\nDump saved!\n");
+        stream.close();
+    } break;
   }
 }
 void Debug::startDebug() {

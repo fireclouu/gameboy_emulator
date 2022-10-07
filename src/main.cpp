@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   gameboy->setup(cpu, mmu);
 
   // Debug
-  debug = new Debug(cpu, mmu);
+  debug = new Debug(gameboy, cpu, mmu);
   signal(SIGINT, signalHandler);
 
 

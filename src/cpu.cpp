@@ -110,21 +110,23 @@ void Cpu::instructionCp(uint8_t value) {
 }
 void Cpu::instructionAdd(uint8_t value) {
   uint8_t accumulator = cpuRegister.reg_a;
-  cpuRegister.reg_a += value;
+  uint8_t result = accumulator + value;
+  cpuRegister.reg_a = result;
 
   cpuRegister.flag_z = (cpuRegister.reg_a == 0);
   cpuRegister.flag_n = 0;
   checkFlagH(accumulator, value, false);
-  cpuRegister.flag_c = ((accumulator + value) > 0xFF);
+  cpuRegister.flag_c = (result < accumulator);
 }
 void Cpu::instructionSub(uint8_t value) {
   uint8_t accumulator = cpuRegister.reg_a;
-  cpuRegister.reg_a -= value;
+  uint8_t result = accumulator - value;
+  cpuRegister.reg_a = result;
 
   cpuRegister.flag_z = (cpuRegister.reg_a == 0);
   checkFlagH(accumulator, value, true);
   cpuRegister.flag_n = 1;
-  cpuRegister.flag_c = (accumulator < value);
+  cpuRegister.flag_c = (result > accumulator);
 }
 uint8_t Cpu::instructionInc(uint8_t regAddrValue) {
   uint8_t valueBytePre = regAddrValue;
@@ -141,6 +143,7 @@ uint8_t Cpu::instructionDec(uint8_t regAddrValue) {
   cpuRegister.flag_z = (valueBytePost == 0);
   checkFlagH(valueBytePre, 1, true);
   cpuRegister.flag_n = 1;
+
   return valueBytePost;
 }
 int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
@@ -235,13 +238,11 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       break;
     // LD A, HL+
     case 0x2A:
-      cpuRegister.reg_a = mmu->readByte(cpuRegister.reg_pair_hl);
-      cpuRegister.reg_pair_hl++;
+      cpuRegister.reg_a = mmu->readByte(cpuRegister.reg_pair_hl++);
       break;
     // LD A, HL-
     case 0x3A:
-      cpuRegister.reg_a = mmu->readByte(cpuRegister.reg_pair_hl);
-      cpuRegister.reg_pair_hl--;
+      cpuRegister.reg_a = mmu->readByte(cpuRegister.reg_pair_hl--);
       break;
     // LD (reg, no HL), (reg, no HL)
     case 0x40:
@@ -349,8 +350,8 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     // LD (nn), SP
     case 0x08:
       parseAddr = mmu->readShort(currentPc + 1);
-      mmu->writeByte(parseAddr, (cpuRegister.sp & 0xFF00) >> 8);
-      mmu->writeByte(parseAddr + 1, (cpuRegister.sp & 0x00FF));
+      mmu->writeByte(parseAddr, (cpuRegister.sp & 0x00FF));
+      mmu->writeByte(parseAddr + 1, (cpuRegister.sp & 0xFF00) >> 8);
       break;
     // LD (HL+), A
     case 0x22:
@@ -378,16 +379,16 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       break;
     // LD HL, SP+r8
     case 0xF8: {
-      uint16_t sp = cpuRegister.sp;
       int8_t nextByte = mmu->readByte(currentPc + 1);
+      uint16_t sp = cpuRegister.sp;
       uint16_t result = sp + nextByte;
       cpuRegister.reg_pair_hl = result;
       currentTCycle += 4;
 
       cpuRegister.flag_z = 0;
       cpuRegister.flag_n = 0;
-      cpuRegister.flag_h = ((sp & 0x0F) + (nextByte & 0x0F) > 0x0F) ? 1 : 0;
-      cpuRegister.flag_c = ((result & 0xFF) < (sp & 0xFF)) ? 1 : 0;
+      cpuRegister.flag_h = ((result & 0x0F) < (sp & 0x0F));
+      cpuRegister.flag_c = ((result & 0xFF) < (sp & 0xFF));
     } break;
     // LD SP, HL
     case 0xF9:
@@ -408,23 +409,23 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     // JUMPS AND STACKS
     // JR r8
     case 0x18: {
-      int8_t nextByte = int8_t(mmu->readByte(currentPc + 1));
+      int8_t nextByte = mmu->readByte(currentPc + 1);
       conditionalJpAdd(1, 1, nextByte);
     } break;
-      // JP NZ, r8
+      // JR NZ, r8
     case 0x20:
-      // JP Z, r8
+      // JR Z, r8
     case 0x28: {
       uint8_t bit = ((currentOpcode & 0x08) >> 3);
-      int8_t nextByte = int8_t(mmu->readByte(currentPc + 1));
+      int8_t nextByte = mmu->readByte(currentPc + 1);
       conditionalJpAdd(cpuRegister.flag_z, bit, nextByte);
     } break;
-      // JP NC, r8
+      // JR NC, r8
     case 0x30:
-      // JP C, r8
+      // JR C, r8
     case 0x38: {
       uint8_t bit = ((currentOpcode & 0x08) >> 3);
-      int8_t nextByte = int8_t(mmu->readByte(currentPc + 1));
+      int8_t nextByte = mmu->readByte(currentPc + 1);
       conditionalJpAdd(cpuRegister.flag_c, bit, nextByte);
     } break;
     // RET Z FLAG
@@ -599,16 +600,16 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       break;
     // ADD SP, r8
     case 0xE8: {
-      uint16_t sp = cpuRegister.sp;
       int8_t nextByte = mmu->readByte(currentPc + 1);
+      uint16_t sp = cpuRegister.sp;
       uint16_t result = sp + nextByte;
-      cpuRegister.sp = result;
       currentTCycle += 8;
 
+      cpuRegister.sp = result;
       cpuRegister.flag_z = 0;
       cpuRegister.flag_n = 0;
-      cpuRegister.flag_h = (((sp & 0x0F) + (nextByte & 0x0F)) > 0x0F) ? 1 : 0;
-      cpuRegister.flag_c = ((result & 0xFF) < (sp & 0xFF)) ? 1 : 0;
+      cpuRegister.flag_h = (result & 0x0F) < (sp & 0x0F);
+      cpuRegister.flag_c = (result & 0xFF) < (sp & 0xFF);
     } break;
 
     // LOGIC
@@ -637,7 +638,7 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     // ADC A, d8
     case 0xCE: {
       uint8_t value;
-      uint8_t bit = ((currentOpcode & 0x08) >> 3) ? cpuRegister.flag_c : 0;
+      uint8_t bit = (currentOpcode & 0x08) ? cpuRegister.flag_c : 0;
       switch (currentOpcode) {
         case 0x86:
         case 0x8E:
@@ -679,7 +680,7 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     // SBC A, d8
     case 0xDE: {
       uint8_t value;
-      uint8_t bit = ((currentOpcode & 0x08) >> 3) ? cpuRegister.flag_c : 0;
+      uint8_t bit = (currentOpcode & 0x08) ? cpuRegister.flag_c : 0;
       switch (currentOpcode) {
         case 0x96:
         case 0x9E:
@@ -755,19 +756,19 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     // CP (HL)
     case 0xBE: {
       uint8_t parseInst = (currentOpcode & 0x18) >> 3;
-      uint8_t nextByte = mmu->readByte(cpuRegister.reg_pair_hl);
+      uint8_t hlValue = mmu->readByte(cpuRegister.reg_pair_hl);
       switch (parseInst) {
         case 0:
-          instructionAnd(nextByte);
+          instructionAnd(hlValue);
           break;
         case 1:
-          instructionXor(nextByte);
+          instructionXor(hlValue);
           break;
         case 2:
-          instructionOr(nextByte);
+          instructionOr(hlValue);
           break;
         case 3:
-          instructionCp(nextByte);
+          instructionCp(hlValue);
           break;
       }
     } break;
