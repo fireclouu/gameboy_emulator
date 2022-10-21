@@ -1,7 +1,7 @@
 <div class="myWrapper" markdown="1">
 <h1>
   <div align="center">
-  <p> :video_game: C/C++ Gameboy Emulator :video_game: </p>  
+  <p> PointVertex </p>  
   <img src="https://img.shields.io/badge/stability-wip-lightgrey.svg">
   <img src="https://img.shields.io/github/commit-activity/w/fireclouu/gbemu_v2">
   <img src="https://img.shields.io/github/repo-size/fireclouu/gbemu_v2">
