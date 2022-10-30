@@ -17,14 +17,15 @@
  */
 
 #include "include/cpu.hpp"
-
 #include <stdint.h>
-
 #include <cstdint>
-
 #include "include/opcode.hpp"
 
-Cpu::Cpu() { currentTCycle = 0; }
+Cpu::Cpu()
+{
+    tCycle = 0;
+    mCycle = 0;
+}
 void Cpu::setMmu(Mmu *mmu) { this->mmu = mmu; }
 void Cpu::setHalt(bool *halt) { this->halt = halt; }
 void Cpu::checkFlagH(uint8_t left, uint8_t right, bool isSubtraction) {
@@ -123,7 +124,7 @@ void Cpu::instructionAdc(uint8_t value) {
   uint16_t result = accumulator + value + carry;
 
   cpuRegister.reg_a = result;
-  cpuRegister.flag_z = (cpuRegister.reg_a == 0);
+  cpuRegister.flag_z = (!(result & 0xFF));
   cpuRegister.flag_n = 0;
   cpuRegister.flag_h = ((accumulator & 0x0F) + (value & 0x0F) + carry) > 0x0F;
   cpuRegister.flag_c = (result > 0xFF);
@@ -134,7 +135,7 @@ void Cpu::instructionSbc(uint8_t value) {
   uint16_t result = (accumulator - (value + carry));
 
   cpuRegister.reg_a = result;
-  cpuRegister.flag_z = (cpuRegister.reg_a == 0);
+  cpuRegister.flag_z = (!(result & 0xFF));
   cpuRegister.flag_n = 1;
   cpuRegister.flag_h = ((accumulator & 0x0F) < ((value & 0x0F) + carry));
   cpuRegister.flag_c = (result > 0xFF);
@@ -168,41 +169,38 @@ uint8_t Cpu::instructionDec(uint8_t regAddrValue) {
   return valueBytePost;
 }
 int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
-  currentTCycle = 0;
+  uint8_t currentOpcode = opcode;
   uint16_t parseAddr;
   uint16_t parseAddrL, parseAddrR;
   uint16_t *holdAddrPtr;
-
   uint16_t currentPc = opcodeAddr;
-  uint8_t currentOpcode = opcode;
-  currentTCycle += 4;
+  tCycle = 4;
   switch (currentOpcode) {
     // ILLEGAL
-    case 0xD3:
-    case 0xDB:
-    case 0xDD:
-    case 0xE3:
-    case 0xE4:
-    case 0xEB:
-    case 0xEC:
-    case 0xED:
-    case 0xF4:
-    case 0xFC:
-    case 0xFD:
+    case op_disabled_01:
+    case op_disabled_02:
+    case op_disabled_03:
+    case op_disabled_04:
+    case op_disabled_05:
+    case op_disabled_06:
+    case op_disabled_07:
+    case op_disabled_08:
+    case op_disabled_09:
+    case op_disabled_10:
+    case op_disabled_11:
+
       printf("ACCESSED ILLEGAL OPCODE!\n");
       cpuRegister.pc++;
       break;
     // SPECIAL
-    // NOP
-    case 0x00:
-    case 0x10:
-    case 0x76:
-    case 0xF3:
-    case 0xFB:
+    case op_nop:
+    case op_stop_0:
+    case op_halt:
+    case op_di:
+    case op_ei:
       break;
     // ROTATES AND SHIFTS
-    // RLCA
-    case 0x07: {
+    case op_rlca: {
       uint8_t bit = ((cpuRegister.reg_a & 0x80) >> 7);
       cpuRegister.reg_a = (cpuRegister.reg_a << 1) + bit;
       cpuRegister.flag_z = 0;
@@ -210,8 +208,7 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_n = 0;
       cpuRegister.flag_c = bit;
     } break;
-    // RLA
-    case 0x17: {
+    case op_rla: {
       uint8_t bit = ((cpuRegister.reg_a & 0x80) >> 7);
       cpuRegister.reg_a = (cpuRegister.reg_a << 1) + cpuRegister.flag_c;
       cpuRegister.flag_z = 0;
@@ -219,8 +216,7 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_n = 0;
       cpuRegister.flag_c = bit;
     } break;
-    // RRCA
-    case 0x0F: {
+    case op_rrca: {
       uint8_t bit = (cpuRegister.reg_a & 1);
       cpuRegister.reg_a = (bit << 7) + (cpuRegister.reg_a >> 1);
       cpuRegister.flag_z = 0;
@@ -228,8 +224,7 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_n = 0;
       cpuRegister.flag_c = bit;
     } break;
-    // RRA
-    case 0x1F: {
+    case op_rra: {
       uint8_t bit = (cpuRegister.reg_a & 1);
       cpuRegister.reg_a = (cpuRegister.flag_c << 7) + (cpuRegister.reg_a >> 1);
       cpuRegister.flag_z = 0;
@@ -239,167 +234,164 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
     } break;
 
     // LOADS 8-bit
-    // LD (reg, no HL), d8
-    case 0x06:
-    case 0x0E:
-    case 0x16:
-    case 0x1E:
-    case 0x26:
-    case 0x2E:
-    case 0x3E:
+    case op_ld_b_d8:
+    case op_ld_c_d8:
+    case op_ld_d_d8:
+    case op_ld_e_d8:
+    case op_ld_h_d8:
+    case op_ld_l_d8:
+    case op_ld_a_d8:
       parseAddrL = (currentOpcode & 0x38) >> 3;
       (*cpuRegister.reg[parseAddrL]) = mmu->readByte(currentPc + 1);
       break;
     // LD A,rr
-    case 0x0A:
-    case 0x1A:
+    case op_ld_a_mbc:
+    case op_ld_a_mde:
       parseAddr = (currentOpcode & 0x30) >> 4;
       holdAddrPtr = (cpuRegister.reg_pair[parseAddr]);
       cpuRegister.reg_a = mmu->readByte(*holdAddrPtr);
       break;
-    // LD A, HL+
-    case 0x2A:
+    // LD A, HL+/-
+    case op_ld_a_mhli:
       cpuRegister.reg_a = mmu->readByte(cpuRegister.reg_pair_hl++);
       break;
-    // LD A, HL-
-    case 0x3A:
+    case op_ld_a_mhld:
       cpuRegister.reg_a = mmu->readByte(cpuRegister.reg_pair_hl--);
       break;
     // LD (reg, no HL), (reg, no HL)
-    case 0x40:
-    case 0x41:
-    case 0x42:
-    case 0x43:
-    case 0x44:
-    case 0x45:
-    case 0x47:
-    case 0x48:
-    case 0x49:
-    case 0x4A:
-    case 0x4B:
-    case 0x4C:
-    case 0x4D:
-    case 0x4F:
-    case 0x50:
-    case 0x51:
-    case 0x52:
-    case 0x53:
-    case 0x54:
-    case 0x55:
-    case 0x57:
-    case 0x58:
-    case 0x59:
-    case 0x5A:
-    case 0x5B:
-    case 0x5C:
-    case 0x5D:
-    case 0x5F:
-    case 0x60:
-    case 0x61:
-    case 0x62:
-    case 0x63:
-    case 0x64:
-    case 0x65:
-    case 0x67:
-    case 0x68:
-    case 0x69:
-    case 0x6A:
-    case 0x6B:
-    case 0x6C:
-    case 0x6D:
-    case 0x6F:
-    case 0x78:
-    case 0x79:
-    case 0x7A:
-    case 0x7B:
-    case 0x7C:
-    case 0x7D:
-    case 0x7F:
+    case op_ld_b_b:
+    case op_ld_b_c:
+    case op_ld_b_d:
+    case op_ld_b_e:
+    case op_ld_b_h:
+    case op_ld_b_l:
+    case op_ld_b_a:
+    case op_ld_c_b:
+    case op_ld_c_c:
+    case op_ld_c_d:
+    case op_ld_c_e:
+    case op_ld_c_h:
+    case op_ld_c_l:
+    case op_ld_c_a:
+    case op_ld_d_b:
+    case op_ld_d_c:
+    case op_ld_d_d:
+    case op_ld_d_e:
+    case op_ld_d_h:
+    case op_ld_d_l:
+    case op_ld_d_a:
+    case op_ld_e_b:
+    case op_ld_e_c:
+    case op_ld_e_d:
+    case op_ld_e_e:
+    case op_ld_e_h:
+    case op_ld_e_l:
+    case op_ld_e_a:
+    case op_ld_h_b:
+    case op_ld_h_c:
+    case op_ld_h_d:
+    case op_ld_h_e:
+    case op_ld_h_h:
+    case op_ld_h_l:
+    case op_ld_h_a:
+    case op_ld_l_b:
+    case op_ld_l_c:
+    case op_ld_l_d:
+    case op_ld_l_e:
+    case op_ld_l_h:
+    case op_ld_l_l:
+    case op_ld_l_a:
+    case op_ld_a_b:
+    case op_ld_a_c:
+    case op_ld_a_d:
+    case op_ld_a_e:
+    case op_ld_a_h:
+    case op_ld_a_l:
+    case op_ld_a_a:
       parseAddrR = (currentOpcode & 0x07);
       parseAddrL = (currentOpcode & 0x38) >> 3;
       (*cpuRegister.reg[parseAddrL]) = (*cpuRegister.reg[parseAddrR]);
       break;
     // LD reg, (HL)
-    case 0x46:
-    case 0x4E:
-    case 0x56:
-    case 0x5E:
-    case 0x66:
-    case 0x6E:
-    case 0x7E: {
+    case op_ld_b_mhl:
+    case op_ld_c_mhl:
+    case op_ld_d_mhl:
+    case op_ld_e_mhl:
+    case op_ld_h_mhl:
+    case op_ld_l_mhl:
+    case op_ld_a_mhl: {
       uint8_t parseRegister = (currentOpcode & 0x38) >> 3;
       uint8_t value = mmu->readByte(cpuRegister.reg_pair_hl);
       (*cpuRegister.reg[parseRegister]) = value;
     } break;
-    // LDH (a8), A
-    case 0xE0:
+
+    case op_ldh_a8_a:
       parseAddr = 0xFF00 + mmu->readByte(currentPc + 1);
       mmu->writeByte(parseAddr, cpuRegister.reg_a);
       break;
-      // LDH A, (a8)
-    case 0xF0:
+
+    case op_ldh_a_a8:
       parseAddr = 0xFF00 + mmu->readByte(currentPc + 1);
       cpuRegister.reg_a = mmu->readByte(parseAddr);
       break;
-      // LD (C), A
-    case 0xE2:
+
+    case op_ld_ff00c_a:
       parseAddr = 0xFF00 + cpuRegister.reg_c;
       mmu->writeByte(parseAddr, cpuRegister.reg_a);
       break;
-      // LDH A, (C)
-    case 0xF2:
+
+    case op_ldh_a_ff00_c:
       parseAddr = 0xFF00 + cpuRegister.reg_c;
       cpuRegister.reg_a = mmu->readByte(parseAddr);
       break;
 
     // LOADS 16-bit
-    // LD rr, d16
-    case 0x01:
-    case 0x11:
-    case 0x21:
-    case 0x31:
+    case op_ld_bc_d16:
+    case op_ld_de_d16:
+    case op_ld_hl_d16:
+    case op_ld_sp_d16:
       parseAddr = (0x30 & currentOpcode) >> 4;
       (*cpuRegister.reg_pair[parseAddr]) = mmu->readShort(currentPc + 1);
       break;
-    // LD (rr), A
-    case 0x02:
-    case 0x12:
+
+    case op_ld_mbc_a:
+    case op_ld_mde_a:
       parseAddr = (currentOpcode & 0x30) >> 4;
       holdAddrPtr = (cpuRegister.reg_pair[parseAddr]);
       mmu->writeByte(*holdAddrPtr, cpuRegister.reg_a);
       break;
-    // LD (nn), SP
-    case 0x08:
+
+    case op_ld_a16_sp:
       parseAddr = mmu->readShort(currentPc + 1);
       mmu->writeByte(parseAddr, (cpuRegister.sp & 0x00FF));
       mmu->writeByte(parseAddr + 1, (cpuRegister.sp & 0xFF00) >> 8);
       break;
-    // LD (HL+), A
-    case 0x22:
+
+    case op_ld_mhli_a:
       mmu->writeByte(cpuRegister.reg_pair_hl++, cpuRegister.reg_a);
       break;
-    // LD (HL-), A
-    case 0x32:
+
+    case op_ld_mhld_a:
       mmu->writeByte(cpuRegister.reg_pair_hl--, cpuRegister.reg_a);
       break;
-    // LD (HL), d8
-    case 0x36: {
+
+    case op_ld_mhl_d8: {
       uint8_t nextByte = mmu->readByte(currentPc + 1);
       mmu->writeByte(cpuRegister.reg_pair_hl, nextByte);
     } break;
     // LD (HL), reg
-    case 0x70:
-    case 0x71:
-    case 0x72:
-    case 0x73:
-    case 0x74:
-    case 0x75:
-    case 0x77:
+    case op_ld_mhl_b:
+    case op_ld_mhl_c:
+    case op_ld_mhl_d:
+    case op_ld_mhl_e:
+    case op_ld_mhl_h:
+    case op_ld_mhl_l:
+    case op_ld_mhl_a:
       parseAddr = (currentOpcode & 0x07);
       mmu->writeByte(cpuRegister.reg_pair_hl, (*cpuRegister.reg[parseAddr]));
       break;
-    // LD HL, SP+r8
-    case 0xF8: {
+
+    case op_ld_hl_sp_add_r8: {
       int8_t nextByte = mmu->readByte(currentPc + 1);
       uint16_t sp = cpuRegister.sp;
       uint16_t result = sp + nextByte;
@@ -411,172 +403,166 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_h = ((result & 0x0F) < (sp & 0x0F));
       cpuRegister.flag_c = ((result & 0xFF) < (sp & 0xFF));
     } break;
-    // LD SP, HL
-    case 0xF9:
+
+    case op_ld_sp_hl:
       cpuRegister.sp = cpuRegister.reg_pair_hl;
       currentTCycle += 4;
       break;
-    // LD (a16), A
-    case 0xEA:
+
+    case op_ld_ma16_a:
       parseAddr = mmu->readShort(currentPc + 1);
       mmu->writeByte(parseAddr, cpuRegister.reg_a);
       break;
-    // LD A, (a16)
-    case 0xFA:
+    
+    case op_ld_a_ma16:
       parseAddr = mmu->readShort(currentPc + 1);
       cpuRegister.reg_a = mmu->readByte(parseAddr);
       break;
 
     // JUMPS AND STACKS
-    // JR r8
-    case 0x18: {
+    case op_jr_r8: {
       int8_t nextByte = mmu->readByte(currentPc + 1);
       conditionalJpAdd(1, 1, nextByte);
     } break;
-      // JR NZ, r8
-    case 0x20:
-      // JR Z, r8
-    case 0x28: {
+
+    case op_jr_nz_r8:
+    case op_jr_z_r8: {
       uint8_t bit = ((currentOpcode & 0x08) >> 3);
       int8_t nextByte = mmu->readByte(currentPc + 1);
       conditionalJpAdd(cpuRegister.flag_z, bit, nextByte);
     } break;
-      // JR NC, r8
-    case 0x30:
-      // JR C, r8
-    case 0x38: {
+
+    case op_jr_nc_r8:
+    case op_jr_c_r8: {
       uint8_t bit = ((currentOpcode & 0x08) >> 3);
       int8_t nextByte = mmu->readByte(currentPc + 1);
       conditionalJpAdd(cpuRegister.flag_c, bit, nextByte);
     } break;
-    // RET Z FLAG
-    case 0xC0:
-    case 0xC8: {
+    
+    case op_ret_nz:
+    case op_ret_z: {
       uint8_t bit = ((currentOpcode & 0x08) >> 3);
       conditionalRet(cpuRegister.flag_z, bit);
     } break;
-    // RET C FLAG
-    case 0xD0:
-    case 0xD8: {
+
+    case op_ret_nc:
+    case op_ret_c: {
       uint8_t bit = ((currentOpcode & 0x08) >> 3);
       conditionalRet(cpuRegister.flag_c, bit);
     } break;
-    // RETI
-    case 0xD9:
+
+    case op_reti:
       instructionRet();
       break;
-    // POP rr
-    case 0xC1:
-    case 0xD1:
-    case 0xE1:
+
+    case op_pop_bc:
+    case op_pop_de:
+    case op_pop_hl:
       parseAddr = (currentOpcode & 0x30) >> 4;
       (*cpuRegister.reg_pair[parseAddr]) = instructionStackPop();
       break;
-    // POP AF
-    case 0xF1:
+    case op_pop_af:
       cpuRegister.reg_pair_af = (instructionStackPop() & 0xFFF0);
       break;
-    // JP Z FLAG, a16
-    case 0xC2:
-    case 0xCA: {
+
+    case op_jp_nz_a16:
+    case op_jp_z_a16: {
       uint8_t bit = (currentOpcode & 0x08) >> 3;
       uint16_t nextWord = mmu->readShort(currentPc + 1);
       conditionalJpA16(cpuRegister.flag_z, bit, nextWord);
     } break;
-    // JP a16
-    case 0xC3: {
-      uint16_t nextWord = mmu->readShort(currentPc + 1);
-      conditionalJpA16(1, 1, nextWord);
-    } break;
-    // CALL Z FLAG
-    case 0xC4:
-    case 0xCC: {
-      uint8_t bit = (currentOpcode & 0x08) >> 3;
-      conditionalCall(currentPc, cpuRegister.flag_z, bit);
-    } break;
-    // CALL C FLAG
-    case 0xD4:
-    case 0xDC: {
-      uint8_t bit = (currentOpcode & 0x08) >> 3;
-      conditionalCall(currentPc, cpuRegister.flag_c, bit);
-    } break;
-    // JP C FLAG, a16
-    case 0xD2:
-    case 0xDA: {
+
+    case op_jp_nc_a16:
+    case op_jp_c_a16: {
       uint8_t bit = (currentOpcode & 0x08) >> 3;
       uint16_t nextWord = mmu->readShort(currentPc + 1);
       conditionalJpA16(cpuRegister.flag_c, bit, nextWord);
     } break;
+
+    case op_jp_a16: {
+      uint16_t nextWord = mmu->readShort(currentPc + 1);
+      conditionalJpA16(1, 1, nextWord);
+    } break;
+
+    case op_call_nz_a16:
+    case op_call_z_a16: {
+      uint8_t bit = (currentOpcode & 0x08) >> 3;
+      conditionalCall(currentPc, cpuRegister.flag_z, bit);
+    } break;
+
+    case op_call_nc_a16:
+    case op_call_c_a16: {
+      uint8_t bit = (currentOpcode & 0x08) >> 3;
+      conditionalCall(currentPc, cpuRegister.flag_c, bit);
+    } break;
+
     // PUSH rr
-    case 0xC5:
-    case 0xD5:
-    case 0xE5:
+    case op_push_bc:
+    case op_push_de:
+    case op_push_hl:
       parseAddr = (0x30 & currentOpcode) >> 4;
       instructionStackPush((*cpuRegister.reg_pair[parseAddr]));
       break;
-    // PUSH AF
-    case 0xF5:
+    case op_push_af:
       instructionStackPush(cpuRegister.reg_pair_af);
       break;
-    // RET
-    case 0xC9:
+
+    case op_ret:
       instructionRet();
       break;
-    // CALL
-    case 0xCD:
+
+    case op_call_a16:
       conditionalCall(currentPc, 1, 1);
       break;
-    // JP HL
-    case 0xE9:
+
+    case op_jp_mhl:
       cpuRegister.pc = cpuRegister.reg_pair_hl;
       break;
-    // RST nn
-    case 0xC7:
-    case 0xCF:
-    case 0xD7:
-    case 0xDF:
-    case 0xE7:
-    case 0xEF:
-    case 0xF7:
-    case 0xFF: {
+
+    case op_rst_00h:
+    case op_rst_08h:
+    case op_rst_10h:
+    case op_rst_18h:
+    case op_rst_20h:
+    case op_rst_28h:
+    case op_rst_30h:
+    case op_rst_38h: {
       uint8_t rstAddr = (currentOpcode & 0x38);
       instructionStackPush(currentPc + 1);
       cpuRegister.pc = rstAddr;
     } break;
     // ALU 8-bit
     // INC reg
-    case 0x04:
-    case 0x0C:
-    case 0x14:
-    case 0x1C:
-    case 0x24:
-    case 0x2C:
-    case 0x3C:
+    case op_inc_b:
+    case op_inc_c:
+    case op_inc_d:
+    case op_inc_e:
+    case op_inc_h:
+    case op_inc_l:
+    case op_inc_a:
       parseAddr = (currentOpcode & 0x38) >> 3;
       (*cpuRegister.reg[parseAddr]) =
           instructionInc((*cpuRegister.reg[parseAddr]));
       break;
-    // INC (HL)
-    case 0x34: {
+    case op_inc_mhl: {
       uint16_t hlAddress = cpuRegister.reg_pair_hl;
       uint8_t value = instructionInc(mmu->readByte(hlAddress));
       mmu->writeByte(hlAddress, value);
       currentTCycle += 4;
     } break;
     // DEC reg
-    case 0x05:
-    case 0x0D:
-    case 0x15:
-    case 0x1D:
-    case 0x25:
-    case 0x2D:
-    case 0x3D:
+    case op_dec_b:
+    case op_dec_c:
+    case op_dec_d:
+    case op_dec_e:
+    case op_dec_h:
+    case op_dec_l:
+    case op_dec_a:
       parseAddr = (currentOpcode & 0x38) >> 3;
       (*cpuRegister.reg[parseAddr]) =
           instructionDec((*cpuRegister.reg[parseAddr]));
       break;
-    // DEC (HL)
-    case 0x35: {
+    case op_dec_mhl: {
       uint16_t hlAddress = cpuRegister.reg_pair_hl;
       uint8_t value = instructionDec(mmu->readByte(hlAddress));
       mmu->writeByte(hlAddress, value);
@@ -585,19 +571,19 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
 
     // ALU 16-bit
     // INC rr
-    case 0x03:
-    case 0x13:
-    case 0x23:
-    case 0x33:
+    case op_inc_bc:
+    case op_inc_de:
+    case op_inc_hl:
+    case op_inc_sp:
       parseAddr = (currentOpcode & 0x30) >> 4;
       (*cpuRegister.reg_pair[parseAddr])++;
       currentTCycle += 4;
       break;
     // ADD HL, rr
-    case 0x09:
-    case 0x19:
-    case 0x29:
-    case 0x39: {
+    case op_add_hl_bc:
+    case op_add_hl_de:
+    case op_add_hl_hl:
+    case op_add_hl_sp: {
       uint8_t parsePairAddr = (currentOpcode & 0x30) >> 4;
       uint16_t *addrPtr = cpuRegister.reg_pair[parsePairAddr];
       uint16_t addrVal = (*addrPtr);
@@ -609,17 +595,17 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_c = uint16_t(hl + (addrVal)) < hl;
       currentTCycle += 4;
     } break;
-    // DEC rr
-    case 0x0B:
-    case 0x1B:
-    case 0x2B:
-    case 0x3B:
+
+    case op_dec_bc:
+    case op_dec_de:
+    case op_dec_hl:
+    case op_dec_sp:
       parseAddr = (0x30 & currentOpcode) >> 4;
       (*cpuRegister.reg_pair[parseAddr])--;
       currentTCycle += 4;
       break;
-    // ADD SP, r8
-    case 0xE8: {
+
+    case op_add_sp_r8: {
       int8_t nextByte = mmu->readByte(currentPc + 1);
       uint16_t sp = cpuRegister.sp;
       uint16_t result = sp + nextByte;
@@ -634,23 +620,21 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
 
     // LOGIC
     // ADD A, r
-    case 0x80:
-    case 0x81:
-    case 0x82:
-    case 0x83:
-    case 0x84:
-    case 0x85:
-    // ADD A, (HL)
-    case 0x86:
-    case 0x87:
-    // ADD A, d8
-    case 0xC6: {
+    case op_add_a_b:
+    case op_add_a_c:
+    case op_add_a_d:
+    case op_add_a_e:
+    case op_add_a_h:
+    case op_add_a_l:
+    case op_add_a_mhl:
+    case op_add_a_a:
+    case op_add_a_d8: {
       uint8_t value;
       switch (currentOpcode) {
-        case 0x86:
+        case op_add_a_mhl:
           value = mmu->readByte(cpuRegister.reg_pair_hl);
           break;
-        case 0xC6:
+        case op_add_a_d8:
           value = mmu->readByte(currentPc + 1);
           break;
         default:
@@ -660,17 +644,15 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       instructionAdd(value);
     } break;
     // ADC A, r
-    case 0x88:
-    case 0x89:
-    case 0x8A:
-    case 0x8B:
-    case 0x8C:
-    case 0x8D:
-    // ADC A, (HL)
-    case 0x8E:
-    case 0x8F:
-    // ADC A, d8
-    case 0xCE: {
+    case op_adc_a_b:
+    case op_adc_a_c:
+    case op_adc_a_d:
+    case op_adc_a_e:
+    case op_adc_a_h:
+    case op_adc_a_l:
+    case op_adc_a_mhl:
+    case op_adc_a_a:
+    case op_adc_a_d8: {
       uint8_t value;
       switch (currentOpcode) {
         case 0x8E:
@@ -686,17 +668,15 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       instructionAdc(value);
     } break;
     // SUB r
-    case 0x90:
-    case 0x91:
-    case 0x92:
-    case 0x93:
-    case 0x94:
-    case 0x95:
-    // SUB (HL)
-    case 0x96:
-    case 0x97:
-    // SUB d8
-    case 0xD6: {
+    case op_sub_b:
+    case op_sub_c:
+    case op_sub_d:
+    case op_sub_e:
+    case op_sub_h:
+    case op_sub_l:
+    case op_sub_mhl:
+    case op_sub_a:
+    case op_sub_d8: {
       uint8_t value;
       switch (currentOpcode) {
         case 0x96:
@@ -712,17 +692,15 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       instructionSub(value);
     } break;
     // SBC A, r
-    case 0x98:
-    case 0x99:
-    case 0x9A:
-    case 0x9B:
-    case 0x9C:
-    case 0x9D:
-    // SBC A, (HL)
-    case 0x9E:
-    case 0x9F:
-    // SBC A, d8
-    case 0xDE: {
+    case op_sbc_a_b:
+    case op_sbc_a_c:
+    case op_sbc_a_d:
+    case op_sbc_a_e:
+    case op_sbc_a_h:
+    case op_sbc_a_l:
+    case op_sbc_a_mhl:
+    case op_sbc_a_a:
+    case op_sbc_a_d8: {
       uint8_t value;
       switch (currentOpcode) {
         case 0x9E:
@@ -737,38 +715,36 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       }
       instructionSbc(value);
     } break;
-    // AND r
-    case 0xA0:
-    case 0xA1:
-    case 0xA2:
-    case 0xA3:
-    case 0xA4:
-    case 0xA5:
-    case 0xA7:
-    // XOR r
-    case 0xA8:
-    case 0xA9:
-    case 0xAA:
-    case 0xAB:
-    case 0xAC:
-    case 0xAD:
-    case 0xAF:
-    // OR r
-    case 0xB0:
-    case 0xB1:
-    case 0xB2:
-    case 0xB3:
-    case 0xB4:
-    case 0xB5:
-    case 0xB7:
-    // CP r
-    case 0xB8:
-    case 0xB9:
-    case 0xBA:
-    case 0xBB:
-    case 0xBC:
-    case 0xBD:
-    case 0xBF: {
+
+    case op_and_b:
+    case op_and_c:
+    case op_and_d:
+    case op_and_e:
+    case op_and_h:
+    case op_and_l:
+    case op_and_a:
+    case op_xor_b:
+    case op_xor_c:
+    case op_xor_d:
+    case op_xor_e:
+    case op_xor_h:
+    case op_xor_l:
+    case op_xor_a:
+    case op_or_b:
+    case op_or_c:
+    case op_or_d:
+    case op_or_e:
+    case op_or_h:
+    case op_or_l:
+    case op_or_a:
+    case op_cp_b:
+    case op_cp_c:
+    case op_cp_d:
+    case op_cp_e:
+    case op_cp_h:
+    case op_cp_l:
+    case op_cp_a: 
+    {
       parseAddr = (currentOpcode & 0x07);
       uint8_t parseInst = (currentOpcode & 0x18) >> 3;
       uint8_t value = (*cpuRegister.reg[parseAddr]);
@@ -787,14 +763,12 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
           break;
       }
     } break;
-    // AND (HL)
-    case 0xA6:
-    // XOR (HL)
-    case 0xAE:
-    // OR (HL)
-    case 0xB6:
-    // CP (HL)
-    case 0xBE: {
+
+    case op_and_mhl:
+    case op_xor_mhl:
+    case op_or_mhl:
+    case op_cp_mhl:
+    {
       uint8_t parseInst = (currentOpcode & 0x18) >> 3;
       uint8_t hlValue = mmu->readByte(cpuRegister.reg_pair_hl);
       switch (parseInst) {
@@ -812,14 +786,12 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
           break;
       }
     } break;
-    // AND d8
-    case 0xE6:
-    // XOR d8
-    case 0xEE:
-    // OR d8
-    case 0xF6:
-    // CP d8
-    case 0xFE: {
+
+    case op_and_d8:
+    case op_xor_d8:
+    case op_or_d8:
+    case op_cp_d8:
+    {
       uint8_t parseInst = (currentOpcode & 0x18) >> 3;
       uint8_t value = mmu->readByte(currentPc + 1);
       switch (parseInst) {
@@ -837,15 +809,14 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
           break;
       }
     } break;
-    // SCF
-    case 0x37:
+    case op_scf:
       cpuRegister.flag_n = 0;
       cpuRegister.flag_h = 0;
       cpuRegister.flag_c = 1;
       break;
-    // DAA
+
     // source - ehaskins.com
-    case 0x27: {
+    case op_daa: {
       uint8_t accumulator = cpuRegister.reg_a;
       uint8_t adjust = 0;
       if (((!cpuRegister.flag_n) && (accumulator & 0x0F) > 0x09) ||
@@ -862,20 +833,18 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode) {
       cpuRegister.flag_z = !(cpuRegister.reg_a) ? 1 : 0;
       cpuRegister.flag_h = 0;
     } break;
-    // CPL
-    case 0x2F:
+
+    case op_cpl:
       cpuRegister.reg_a = ~cpuRegister.reg_a;
       cpuRegister.flag_n = 1;
       cpuRegister.flag_h = 1;
       break;
-    // CCF
-    case 0x3F:
+    case op_ccf:
       cpuRegister.flag_n = 0;
       cpuRegister.flag_h = 0;
       cpuRegister.flag_c = (cpuRegister.flag_c) ? 0 : 1;
       break;
-    // Prefix CB
-    case 0xCB:
+    case op_prefix_cb:
       cpuRegister.pc++;
       currentOpcode = mmu->readByte(currentPc + 1);
       decodeCb(currentPc + 1, currentOpcode);

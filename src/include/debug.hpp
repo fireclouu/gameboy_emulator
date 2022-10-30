@@ -34,7 +34,7 @@ class Debug {
   union {
     uint8_t breakCode;
     struct {
-      uint8_t pc : 1, opcode : 1, ffwd : 1, step : 1, next : 1, iterate : 1;
+      uint8_t pc : 1, opcode : 1, ffwd : 1, step : 1, next : 1, iterate : 1, continous : 1;
     };
   } break_n;
   uint16_t storeOpcode;

@@ -19,13 +19,30 @@
 #include "include/gameboy.hpp"
 
 Gameboy::Gameboy() {
+  ime = false;
   halt = false;
+  this->mmu = NULL;
+  this->cpu = NULL;
 }
 
-Gameboy::~Gameboy() {
+Gameboy::~Gameboy() {}
+
+void Gameboy::handleInterrupt(uint16_t pc) {
+  if (ime) {
+    uint8_t const IF = mmu->readByte(INTERRUPT_FLAG);
+    uint8_t const IE = mmu->readByte(INTERRUPT_ENABLE);
+        if (IE & IF) {
+            // VBLANK
+            cpu->instructionStackPush(pc + 1);
+            cpu->cpuRegister.pc = INT_VBLANK;
+
+        }
+  }
 }
 
 void Gameboy::setup(Cpu *cpu, Mmu *mmu) {
+  this->mmu = mmu;
+  this->cpu = cpu;
   cpu->setMmu(mmu);
   cpu->setHalt(&halt);
   mmu->setCurrentTCycle(&cpu->currentTCycle);

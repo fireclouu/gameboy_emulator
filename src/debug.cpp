@@ -93,6 +93,10 @@ void Debug::interact() {
 
   std::stringstream ss;
   switch (opt) {
+      case 'a':
+        break_n.breakCode = 0;
+          break_n.continous = 1;
+          break;
     case 'f':
       if (!(x[1] == '\0')) {
         break_n.breakCode = 0;
@@ -163,5 +167,9 @@ void Debug::startDebug() {
     print();
     interact();
   }
+  if (break_n.continous) {
+      iterate = 0;
+      print();
+  };
   iterate++;
 }

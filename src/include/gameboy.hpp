@@ -27,11 +27,24 @@
 
 class Gameboy {
  public:
+  enum IO_ADDR {
+    INT_VBLANK         = 0x40,
+    INT_LCDSTAT = 0x48,
+    INT_TIMER = 0x50,
+    INT_SERIAL = 0x58,
+    INT_JOYPAD = 0x60,
+    INTERRUPT_FLAG   = 0xFF0F,
+    INTERRUPT_ENABLE = 0xFFFF,
+  };
+  bool ime;
+  Mmu *mmu;
+  Cpu *cpu;
   bool halt;
   uint8_t romData[ROM_SIZE] = {};
   Gameboy();
   ~Gameboy();
   void setup(Cpu *cpu, Mmu *mmu);
+  void handleInterrupt(uint16_t pc);
 };
 
 #endif  // SRC_INCLUDE_GAMEBOY_HPP_
