@@ -41,7 +41,7 @@ Debug::Debug(Gameboy *gameboy, Cpu *cpu, Mmu *mmu) {
 void Debug::print() {
   int pc = cpu->cpuRegister.pc;
   int sp = cpu->cpuRegister.sp;
-  printf("ITER: %lu  CYC: %u\n", iterate, cpu->currentTCycle);
+  printf("ITER: %lu\n", iterate);
   printf(
       "PC: %04X (%02X)  SP: %04X\nAF: %04X  BC: %04X  DE: %04X  HL: %04X  %s\n",
       pc, mmu->readByte(pc), cpu->cpuRegister.sp, cpu->cpuRegister.reg_pair_af,

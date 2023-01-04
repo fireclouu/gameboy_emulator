@@ -24,22 +24,23 @@
 #include <cstdint>
 #include "gameboy.hpp"
 
-class Host {
- private:
+class Host
+{
+private:
+  uint8_t romData[ROM_SIZE];
+  void handleUserArgument();
   bool fileExist(std::string filePath);
   char **argv;
   char *filePath;
   int fileSize;
   int argc;
-  Gameboy *gameboy;
-  void handleUserArgument();
-  void readFileContents(std::string filePath);
   int getFileSize(std::string filePath);
+  uint8_t *readFileContents(std::string filePath);
 
- public:
-  explicit Host(int argc, char **argv, Gameboy *gameboy);
-  void loadFile(std::string filePath);
-  void loadFileOnArgument();
+public:
+  Host(int argc, char **argv);
+  uint8_t *loadFile(std::string filePath);
+  uint8_t *loadFileOnArgument();
 };
 
-#endif  // SRC_INCLUDE_HOST_HPP_
+#endif // SRC_INCLUDE_HOST_HPP_

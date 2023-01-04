@@ -18,7 +18,7 @@
 
 #ifndef SRC_INCLUDE_CPU_HPP_
 #define SRC_INCLUDE_CPU_HPP_
-#define TITLE "GBEMU_V2"
+#define TITLE "GB EMULATOR"
 #include <cstdint>
 
 #include "mmu.hpp"
@@ -337,11 +337,18 @@ class Cpu {
   struct CpuRegister cpuRegister = {};
   Cpu();
   ~Cpu();
-  void checkFlagH(uint8_t left, uint8_t right, bool isSubtraction);
+  uint8_t instructionInc(uint8_t regAddrValue);
+  uint8_t instructionDec(uint8_t regAddrValue);
+  uint16_t instructionStackPop();
   int decode(uint16_t opcodeAddr, uint8_t opcode);
   int decodeCb(uint16_t opcodeAddr, uint8_t opcode);
+  void checkFlagH(uint8_t left, uint8_t right, bool isSubtraction);
+  void conditionalJpAdd(uint8_t flag, uint8_t expected, int8_t value);
+  void conditionalJpA16(uint8_t flag, uint8_t expected, uint16_t value);
+  void conditionalRet(uint8_t flag, uint8_t expected);
+  void conditionalCall(uint16_t pc, uint8_t flag, uint8_t expected);
+  void initializeRegisters();
   void instructionStackPush(uint16_t addr_value);
-  uint16_t instructionStackPop();
   void instructionRet();
   void instructionCall(uint16_t pc);
   void instructionAnd(uint8_t value);
@@ -352,12 +359,6 @@ class Cpu {
   void instructionAdc(uint8_t value);
   void instructionSbc(uint8_t value);
   void instructionSub(uint8_t value);
-  uint8_t instructionInc(uint8_t regAddrValue);
-  uint8_t instructionDec(uint8_t regAddrValue);
-  void conditionalJpAdd(uint8_t flag, uint8_t expected, int8_t value);
-  void conditionalJpA16(uint8_t flag, uint8_t expected, uint16_t value);
-  void conditionalRet(uint8_t flag, uint8_t expected);
-  void conditionalCall(uint16_t pc, uint8_t flag, uint8_t expected);
   void setMmu(Mmu* mmu);
   void setHalt(bool* halt);
 };

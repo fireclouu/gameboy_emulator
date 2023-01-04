@@ -19,32 +19,41 @@
 #ifndef SRC_INCLUDE_GAMEBOY_HPP_
 #define SRC_INCLUDE_GAMEBOY_HPP_
 #include <cstdint>
+#include <string>
 
 #include "cpu.hpp"
 #include "mmu.hpp"
+#include "opcode.hpp"
 
 #define ROM_SIZE 0x8000
 
-class Gameboy {
- public:
-  enum IO_ADDR {
-    INT_VBLANK         = 0x40,
+class Gameboy
+{
+private:
+  enum IO_ADDR
+  {
+    INT_VBLANK = 0x40,
     INT_LCDSTAT = 0x48,
     INT_TIMER = 0x50,
     INT_SERIAL = 0x58,
     INT_JOYPAD = 0x60,
-    INTERRUPT_FLAG   = 0xFF0F,
+    INTERRUPT_FLAG = 0xFF0F,
     INTERRUPT_ENABLE = 0xFFFF,
   };
-  bool ime;
-  Mmu *mmu;
-  Cpu *cpu;
+
   bool halt;
-  uint8_t romData[ROM_SIZE] = {};
-  Gameboy();
+  bool ime;
+  Cpu *cpu;
+  Mmu *mmu;
+
+public:
+  Gameboy(Cpu *cpu, Mmu *mmu, uint8_t *romData);
   ~Gameboy();
-  void setup(Cpu *cpu, Mmu *mmu);
+  uint8_t *romData;
+
   void handleInterrupt(uint16_t pc);
+  void setRom(uint8_t *romData);
+  void start();
 };
 
-#endif  // SRC_INCLUDE_GAMEBOY_HPP_
+#endif // SRC_INCLUDE_GAMEBOY_HPP_

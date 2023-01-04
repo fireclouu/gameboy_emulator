@@ -4,10 +4,27 @@
 # Ignore Gradle build output directory
 build
 
-# directort
+# directory
 assets
 src/todos
+target
+.vscode
+CMakeFiles
 
 # binaries
 gbemuv2
 gbemuv2_memtest
+*.gb
+*.exe
+*.bin
+
+# platform
+*.sln
+
+# ide specific
+*.vcxproj
+*.vcxproj.filters
+
+# cmake
+CMakeCache.txt
+cmake_install.cmake

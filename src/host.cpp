@@ -21,43 +21,53 @@
 #include <cstdint>
 #include <cstdlib>
 
-Host::Host(int argc, char **argv, Gameboy *gameboy) {
+Host::Host(int argc, char **argv)
+{
   this->argc = argc;
   this->argv = argv;
-  this->gameboy = gameboy;
   fileSize = 0;
   handleUserArgument();
 }
-void Host::handleUserArgument() {
-  while ((++argv)[0]) {
-    if (argv[0][0] == '-') {
-      switch (argv[0][1]) {
-        case 'i':
-          if ((argv[1] == nullptr) || std::string(argv[1]).empty()) {
-            printf("error: provide file path\n");
-            exit(1);
-          } else {
-            filePath = argv[1];
-          }
-          break;
-        default:
-          printf("-%c: Unknown option\n", argv[0][1]);
+void Host::handleUserArgument()
+{
+  while ((++argv)[0])
+  {
+    if (argv[0][0] == '-')
+    {
+      switch (argv[0][1])
+      {
+      case 'i':
+        if ((argv[1] == nullptr) || std::string(argv[1]).empty())
+        {
+          printf("error: provide file path\n");
           exit(1);
+        }
+        else
+        {
+          filePath = argv[1];
+        }
+        break;
+      default:
+        printf("-%c: Unknown option\n", argv[0][1]);
+        exit(1);
       }
     }
   }
 }
-bool Host::fileExist(std::string filePath) {
+bool Host::fileExist(std::string filePath)
+{
   bool value = false;
   std::ifstream stream(filePath, std::ios::binary | std::ios::in);
   value = stream.is_open();
   stream.close();
   return value;
 }
-int Host::getFileSize(std::string filePath) {
+int Host::getFileSize(std::string filePath)
+{
   int size = 0;
   std::ifstream stream(filePath, std::ios::binary | std::ios::in);
-  if (stream.is_open()) {
+  if (stream.is_open())
+  {
     stream.seekg(0, std::ios::end);
     size = stream.tellg();
   }
@@ -65,25 +75,35 @@ int Host::getFileSize(std::string filePath) {
   stream.close();
   return size;
 }
-void Host::readFileContents(std::string filePath) {
+uint8_t* Host::readFileContents(std::string filePath)
+{
   std::ifstream stream;
-  stream.open(filePath, std::ios::binary | std::ios::in);
-  if (stream.is_open()) {
-    while (stream.good()) {
-      stream.read(reinterpret_cast<char *>(gameboy->romData), fileSize);
+  stream.open(filePath.c_str(), std::ios::binary | std::ios::in);
+  if (stream.is_open())
+  {
+    while (stream.good())
+    {
+      stream.read(reinterpret_cast<char*>(romData), fileSize);
     }
   }
   stream.close();
+  return this->romData;
 }
-void Host::loadFile(const std::string filePath) {
-  if (!fileExist(filePath)) {
+uint8_t* Host::loadFile(const std::string filePath)
+{
+  if (!fileExist(filePath))
+  {
     printf("%s: File could not be found", filePath.c_str());
     exit(1);
   }
-  if (!(fileSize = getFileSize(filePath))) {
+  if (!(fileSize = getFileSize(filePath)))
+  {
     printf("%s: File size is invalid!", filePath.c_str());
     exit(1);
   }
-  readFileContents(filePath);
+  return readFileContents(filePath);
 }
-void Host::loadFileOnArgument() { loadFile(filePath); }
+uint8_t* Host::loadFileOnArgument()
+{
+  return loadFile(filePath);
+}

@@ -18,13 +18,11 @@
 
 #ifndef SRC_INCLUDE_MAIN_HPP_
 #define SRC_INCLUDE_MAIN_HPP_
-#define TITLE "GBEMU_V2"
-#include <fstream>
-#include <iostream>
-#include <string>
+#define TITLE "GB EMULATOR"
+
 #include "cpu.hpp"
+#include "gameboy.hpp"
 #include "host.hpp"
 #include "mmu.hpp"
-#include "opcode.hpp"
 
 #endif  // SRC_INCLUDE_MAIN_HPP_

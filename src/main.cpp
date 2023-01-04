@@ -18,65 +18,40 @@
 
 #include "include/main.hpp"
 
-#include "include/debug.hpp"
+int main(int argc, char **argv)
+{
+  //printf("%s\n", TITLE);
 
-Debug *debug;
-Gameboy *gameboy;
-void signalHandler(int signal) { gameboy->halt = true; }
+  // testpaths
+  std::string testpaths[] = {
+      "../testrom/01-special.gb",
+      "../testrom/02-interrupts.gb",
+      "../testrom/03-op sp,hl.gb",
+      "../testrom/04-op r,imm.gb",
+      "../testrom/05-op rp.gb",
+      "../testrom/06-ld r,r.gb",
+      "../testrom/07-jr,jp,call,ret,rst.gb",
+      "../testrom/08-misc instrs.gb",
+      "../testrom/09-op r,r.gb",
+      "../testrom/10-bit ops.gb",
+      "../testrom/11-op a,(hl).gb",
+  };
 
-int main(int argc, char **argv) {
-  printf("%s\n", TITLE);
-  gameboy = new Gameboy();
-  Cpu *cpu = new Cpu();
-  Mmu *mmu = new Mmu();
-  Host *host = new Host(argc, argv, gameboy);
-  host->loadFileOnArgument();
-  gameboy->setup(cpu, mmu);
+  for (int i = 0; i < 11; i++) {
+    // init host
+    Host *host = new Host(argc, argv);
+    //uint8_t *romData = host->loadFileOnArgument();
+    uint8_t *romData = host->loadFile(testpaths[i]);
 
-  // Debug
-  debug = new Debug(gameboy, cpu, mmu);
-  signal(SIGINT, signalHandler);
+    // init modules
+    Cpu *cpu = new Cpu();
+    Mmu *mmu = new Mmu();
 
-
-  printf("PROGRAM START\n-----\n");
-
-  cpu->cpuRegister.pc = 0x0100;
-  cpu->cpuRegister.sp = 0xFFFE;
-  cpu->cpuRegister.reg_a = 0x11;
-  cpu->cpuRegister.reg_f = 0x80;
-  cpu->cpuRegister.reg_b = 0x00;
-  cpu->cpuRegister.reg_c = 0x00;
-  cpu->cpuRegister.reg_pair_de = 0xFF56;
-  cpu->cpuRegister.reg_pair_hl = 0x000D;
-
-  uint64_t tCycle = 0;
-  const uint32_t MAX_T_CYCLE = 4194304;
-  int cycle = 0;
-  while (!gameboy->halt) {
-    uint16_t pc;
-    uint8_t opcode;
-
-    // blarggs test - serial output
-    if (mmu->readByte(0xff02) == 0x81) {
-      char c = mmu->readByte(0xff01);
-      printf("%c", c);
-      mmu->writeByte(0xff02, 0);
-    }
-    debug->startDebug();
-    pc = cpu->cpuRegister.pc;
-    opcode = mmu->readByte(pc);
-    cpu->cpuRegister.pc += OP_BYTES[opcode];
-    // initial timing
-    // lcd 4.194 MHz
-    // 16.74ms / cycle
-    cycle = cpu->decode(pc, opcode);
-
-    tCycle += cycle;
-    
-    if (tCycle > MAX_T_CYCLE) tCycle = 0;
-
+    // init system
+    Gameboy *gameboy = new Gameboy(cpu, mmu, romData);
+    gameboy->setRom(romData);
+    gameboy->start();
   }
-  debug->endDebug();
-  printf("\n-----\nPROGRAM END\n");
+
   return 0;
 }
