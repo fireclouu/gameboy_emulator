@@ -27,20 +27,21 @@
 class Host
 {
 private:
-  uint8_t romData[ROM_SIZE];
   void handleUserArgument();
   bool fileExist(std::string filePath);
   char **argv;
-  char *filePath;
   int fileSize;
   int argc;
   int getFileSize(std::string filePath);
-  uint8_t *readFileContents(std::string filePath);
+  void readFileContents(std::string filePath);
+  uint8_t romData[ROM_SIZE];
+  std::string filePath;
 
 public:
   Host(int argc, char **argv);
-  uint8_t *loadFile(std::string filePath);
-  uint8_t *loadFileOnArgument();
+  bool loadFile(std::string filePath);
+  bool loadFileOnArgument();
+  uint8_t *getRomData();
 };
 
 #endif // SRC_INCLUDE_HOST_HPP_

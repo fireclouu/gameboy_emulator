@@ -24,6 +24,7 @@
 #include "cpu.hpp"
 #include "mmu.hpp"
 #include "opcode.hpp"
+#include "debug.hpp"
 
 #define ROM_SIZE 0x8000
 
@@ -47,12 +48,10 @@ private:
   Mmu *mmu;
 
 public:
-  Gameboy(Cpu *cpu, Mmu *mmu, uint8_t *romData);
+  Gameboy(Cpu *cpu, Mmu *mmu);
   ~Gameboy();
-  uint8_t *romData;
 
   void handleInterrupt(uint16_t pc);
-  void setRom(uint8_t *romData);
   void start();
 };
 

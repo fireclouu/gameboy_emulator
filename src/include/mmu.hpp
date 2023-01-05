@@ -32,7 +32,7 @@
 class Mmu {
  private:
   uint32_t *currentTCycle;
-  uint8_t rom[ROM_SIZE] = {};
+  uint8_t *romData;
   uint8_t vram[VRAM_SIZE] = {};
   uint8_t eram[ERAM_SIZE] = {};
   uint8_t wram[WRAM_SIZE] = {};
@@ -41,7 +41,7 @@ class Mmu {
   uint8_t hram[HRAM_SIZE] = {};
 
  public:
-  Mmu();
+  Mmu(uint8_t *romData);
   ~Mmu();
   void writeByte(uint16_t addr, uint8_t value);
   uint8_t readByte(uint16_t addr);

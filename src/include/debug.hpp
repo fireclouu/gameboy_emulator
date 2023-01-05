@@ -28,7 +28,6 @@
 
 class Debug {
  public:
-  Gameboy *gameboy;
   Cpu *cpu;
   Mmu *mmu;
   union {
@@ -44,7 +43,7 @@ class Debug {
   uint64_t opcodeTally[0xFF];
   uint64_t opcodeTallyCb[0xFF];
   int debugDisable;
-  explicit Debug(Gameboy *gameboy, Cpu *cpu, Mmu *mmu);
+  explicit Debug(Cpu *cpu, Mmu *mmu);
   void print();
   void interact();
   void startDebug();

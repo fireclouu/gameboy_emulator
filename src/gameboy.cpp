@@ -82,17 +82,15 @@ bool isLooping(Cpu *cpu, Mmu *mmu)
   return false;
 }
 
-Gameboy::Gameboy(Cpu *cpu, Mmu *mmu, uint8_t *romData)
+Gameboy::Gameboy(Cpu *cpu, Mmu *mmu)
 {
   halt = false;
   ime = false;
-  this->romData = romData;
 
   this->cpu = cpu;
   this->mmu = mmu;
   cpu->setMmu(mmu);
   cpu->setHalt(&halt);
-  mmu->setRom(this->romData);
 }
 
 Gameboy::~Gameboy() {}
@@ -112,11 +110,6 @@ void Gameboy::handleInterrupt(uint16_t pc)
   }
 }
 
-void Gameboy::setRom(uint8_t *romData) { 
-  this->romData = romData;
-  mmu->setRom(this->romData);
-}
-
 void Gameboy::start()
 {
   // testvars
@@ -130,7 +123,9 @@ void Gameboy::start()
   lastPc = NULL;
   lastInstruction = NULL;
 
-
+  // debugger attach
+  Debug *debug = new Debug(
+    cpu, mmu);
   // initial setup
   cpu->cpuRegister.pc = 0x0100;
   cpu->cpuRegister.sp = 0xFFFE;
@@ -145,6 +140,9 @@ void Gameboy::start()
   {
     uint16_t pc;
     uint8_t opcode;
+
+    // debug
+    debug->startDebug();
 
     // blarggs test - serial output
     if (mmu->readByte(0xff02) == 0x81)
@@ -174,4 +172,5 @@ void Gameboy::start()
     // 16.74ms / cycle
     cpu->decode(pc, opcode);
   }
+  debug->endDebug();
 }

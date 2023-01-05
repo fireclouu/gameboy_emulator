@@ -75,7 +75,8 @@ int Host::getFileSize(std::string filePath)
   stream.close();
   return size;
 }
-uint8_t* Host::readFileContents(std::string filePath)
+
+void Host::readFileContents(std::string filePath)
 {
   std::ifstream stream;
   stream.open(filePath.c_str(), std::ios::binary | std::ios::in);
@@ -87,23 +88,33 @@ uint8_t* Host::readFileContents(std::string filePath)
     }
   }
   stream.close();
-  return this->romData;
 }
-uint8_t* Host::loadFile(const std::string filePath)
+bool Host::loadFile(const std::string filePath)
 {
+  if (filePath.empty())
+  {
+    printf("No file defined.");
+    return false;
+  }
   if (!fileExist(filePath))
   {
     printf("%s: File could not be found", filePath.c_str());
-    exit(1);
+    return false;
   }
   if (!(fileSize = getFileSize(filePath)))
   {
     printf("%s: File size is invalid!", filePath.c_str());
-    exit(1);
+    return false;
   }
-  return readFileContents(filePath);
+
+  readFileContents(filePath);
+  return true;
 }
-uint8_t* Host::loadFileOnArgument()
+bool Host::loadFileOnArgument()
 {
   return loadFile(filePath);
+}
+
+uint8_t* Host::getRomData() {
+  return this->romData;
 }

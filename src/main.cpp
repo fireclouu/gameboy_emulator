@@ -20,7 +20,7 @@
 
 int main(int argc, char **argv)
 {
-  //printf("%s\n", TITLE);
+  // printf("%s\n", TITLE);
 
   // testpaths
   std::string testpaths[] = {
@@ -37,21 +37,21 @@ int main(int argc, char **argv)
       "../testrom/11-op a,(hl).gb",
   };
 
-  for (int i = 0; i < 11; i++) {
-    // init host
-    Host *host = new Host(argc, argv);
-    //uint8_t *romData = host->loadFileOnArgument();
-    uint8_t *romData = host->loadFile(testpaths[i]);
+  // init host
+  Host *host = new Host(argc, argv);
+  uint8_t *romData = NULL;
 
-    // init modules
-    Cpu *cpu = new Cpu();
-    Mmu *mmu = new Mmu();
+  if (host->loadFileOnArgument())
+    romData = host->getRomData();
+  else
+    return 1;
 
-    // init system
-    Gameboy *gameboy = new Gameboy(cpu, mmu, romData);
-    gameboy->setRom(romData);
-    gameboy->start();
-  }
+  // init modules
+  Cpu *cpu = new Cpu();
+  Mmu *mmu = new Mmu(romData);
 
+  // init system
+  Gameboy *gameboy = new Gameboy(cpu, mmu);
+  gameboy->start();
   return 0;
 }

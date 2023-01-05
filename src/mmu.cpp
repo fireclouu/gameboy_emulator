@@ -18,10 +18,9 @@
 
 #include "include/mmu.hpp"
 
-#include <algorithm>
-#include <cstring>
-
-Mmu::Mmu() {}
+Mmu::Mmu(uint8_t *romData) {
+  this->romData = romData;
+}
 
 uint8_t Mmu::readByte(uint16_t addr) {
   currentTCycle += 4;
@@ -33,14 +32,14 @@ uint8_t Mmu::readByte(uint16_t addr) {
     case 0x1000:
     case 0x2000:
     case 0x3000:
-      memoryByte = rom[addr & 0x7FFF];
+      memoryByte = romData[addr & 0x7FFF];
       break;
     //  ROM Bank 01-NN (16kB)
     case 0x4000:
     case 0x5000:
     case 0x6000:
     case 0x7000:
-      memoryByte = rom[addr & 0x7FFF];
+      memoryByte = romData[addr & 0x7FFF];
       break;
       //  Video RAM (8kB)
     case 0x8000:
@@ -188,6 +187,6 @@ void Mmu::setCurrentTCycle(uint32_t* currentTCycle) {
   this->currentTCycle = currentTCycle;
 }
 
-void Mmu::setRom(uint8_t romData[ROM_SIZE]) {
-    std::copy(romData, romData + ROM_SIZE, this->rom);
+void Mmu::setRom(uint8_t *romData) {
+    std::copy(romData, romData + ROM_SIZE, this->romData);
 }

@@ -29,10 +29,10 @@
 
 #include "include/opcode.hpp"
 
-Debug::Debug(Gameboy *gameboy, Cpu *cpu, Mmu *mmu) {
+Debug::Debug(Cpu *cpu, Mmu *mmu) {
+  iterate = 0;
   storeOpcode = storeIterate = storeFfwd = storePc = 0;
   debugDisable = false;
-  this->gameboy = gameboy;
   this->cpu = cpu;
   this->mmu = mmu;
   break_n.breakCode = 0xFF;  // temporary break
@@ -144,7 +144,7 @@ void Debug::interact() {
         std::ofstream stream("dump");
         if (stream.is_open()) {
             for (int x = 0; x < 0xFFFF; x++) {
-                stream << gameboy->romData[x];
+                stream << mmu->readByte(x);
             }
         }
         printf("\nDump saved!\n");
@@ -168,7 +168,7 @@ void Debug::startDebug() {
     interact();
   }
   if (break_n.continous) {
-      iterate = 0;
+    //  iterate = 0;
       print();
   };
   iterate++;
