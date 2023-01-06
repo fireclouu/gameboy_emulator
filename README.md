@@ -19,7 +19,8 @@ Clone this repository and build using CMake. Use output binary as ```gbemu_v2 -i
 
 Sample output:
 
-![Tests](https://github.com/fireclouu/gbemu_v2/blob/image_tests.jpg?raw=true)
+<img src="https://github.com/fireclouu/gbemu_v2/raw/7fc68e3c9c3d85031ae942650d81591d739847ce/blob/image_tests.png">
+
 ___
 ### :green_book: Status
 - [x] Opcodes
