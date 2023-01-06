@@ -16,6 +16,10 @@ A personal project emulating Gameboy CPU and internals on other systems. :video_
 ___
 ### Building
 Clone this repository and build using CMake. Use output binary as ```gbemu_v2 -i {path/to/file}```
+
+Sample output:
+
+![Tests](https://github.com/fireclouu/gbemu_v2/blob/image_tests.jpg?raw=true)
 ___
 ### :green_book: Status
 - [x] Opcodes
