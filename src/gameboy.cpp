@@ -16,7 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "include/gameboy.hpp"
+#include "../include/gameboy.hpp"
 
 // isMessagePassed
 const char PASSED[] = {0x50, 0x61, 0x73, 0x73, 0x65, 0x64, 0x0a}; // PASSED\n
@@ -110,6 +110,34 @@ void Gameboy::handleInterrupt(uint16_t pc)
   }
 }
 
+// for blaarg test suite
+void testSerialOutput(Mmu *mmu)
+{
+  if (mmu->readByte(0xff02) == 0x81)
+  {
+    char c = mmu->readByte(0xff01);
+    // printf("%c", c);
+
+    fetchInitialMessage(c);
+    isPassed = isMessagePassed(c);
+
+    mmu->writeByte(0xff02, 0);
+  }
+}
+
+void testAutomation(Cpu *cpu, Mmu *mmu, bool *halt) 
+{
+  testSerialOutput(mmu);
+
+  // check if looping endlessly
+  if (isLooping(cpu, mmu))
+  {
+    std::string msg = isPassed ? "OK!" : "FAIL!";
+    printf("%s\n", msg.c_str());
+    *halt = true;
+  }
+}
+
 void Gameboy::start()
 {
   // testvars
@@ -124,8 +152,9 @@ void Gameboy::start()
   lastInstruction = NULL;
 
   // debugger attach
-  Debug *debug = new Debug(
-    cpu, mmu);
+  Debug *debug = NULL;
+  // debug = new Debug(cpu, mmu);
+
   // initial setup
   cpu->cpuRegister.pc = 0x0100;
   cpu->cpuRegister.sp = 0xFFFE;
@@ -142,27 +171,11 @@ void Gameboy::start()
     uint8_t opcode;
 
     // debug
-    debug->startDebug();
-
-    // blarggs test - serial output
-    if (mmu->readByte(0xff02) == 0x81)
-    {
-      char c = mmu->readByte(0xff01);
-      // printf("%c", c);
-
-      fetchInitialMessage(c);
-      isPassed = isMessagePassed(c);
-
-      mmu->writeByte(0xff02, 0);
-    }
-
-    // check if looping endlessly
-    if (isLooping(cpu, mmu))
-    {
-      std::string x = isPassed ? "OK!" : "FAILED!";
-      printf("%s\n", x.c_str());
-      this->halt = true;
-    }
+    if (debug != NULL)
+      debug->startDebug();
+    
+    // for testing
+    testAutomation(cpu, mmu, &this->halt);
 
     pc = cpu->cpuRegister.pc;
     opcode = mmu->readByte(pc);
@@ -172,5 +185,6 @@ void Gameboy::start()
     // 16.74ms / cycle
     cpu->decode(pc, opcode);
   }
-  debug->endDebug();
+  if (debug != NULL)
+    debug->endDebug();
 }

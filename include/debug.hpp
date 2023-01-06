@@ -18,10 +18,12 @@
 
 #ifndef SRC_INCLUDE_DEBUG_HPP_
 #define SRC_INCLUDE_DEBUG_HPP_
-#include <csignal>
-#include <cstdint>
-#include <iostream>
 
+#include <stdint.h>
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include "opcode.hpp"
 #include "cpu.hpp"
 #include "mmu.hpp"
 #include "gameboy.hpp"

@@ -14,7 +14,9 @@ A personal project emulating Gameboy CPU and internals on other systems. :video_
 ###### :bulb: Using C/C++ for flexible memory management feature.
 
 ___
-
+### Building
+Clone this repository and build using CMake. Use output binary as ```gbemu_v2 -i {path/to/file}```
+___
 ### :green_book: Status
 - [x] Opcodes
 - [ ] Timings

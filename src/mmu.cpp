@@ -16,7 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "include/mmu.hpp"
+#include "../include/mmu.hpp"
 
 Mmu::Mmu(uint8_t *romData) {
   this->romData = romData;
@@ -188,5 +188,6 @@ void Mmu::setCurrentTCycle(uint32_t* currentTCycle) {
 }
 
 void Mmu::setRom(uint8_t *romData) {
-    std::copy(romData, romData + ROM_SIZE, this->romData);
+    //std::copy(romData, romData + ROM_SIZE, this->romData);
+    this->romData = romData;
 }

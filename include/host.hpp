@@ -18,10 +18,10 @@
 
 #ifndef SRC_INCLUDE_HOST_HPP_
 #define SRC_INCLUDE_HOST_HPP_
+
+#include <stdint.h>
 #include <fstream>
 #include <iostream>
-#include <string>
-#include <cstdint>
 #include "gameboy.hpp"
 
 class Host

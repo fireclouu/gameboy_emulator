@@ -18,9 +18,8 @@
 
 #ifndef SRC_INCLUDE_GAMEBOY_HPP_
 #define SRC_INCLUDE_GAMEBOY_HPP_
-#include <cstdint>
-#include <string>
 
+#include <stdint.h>
 #include "cpu.hpp"
 #include "mmu.hpp"
 #include "opcode.hpp"

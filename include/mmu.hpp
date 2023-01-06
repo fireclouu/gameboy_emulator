@@ -19,15 +19,15 @@
 #ifndef SRC_INCLUDE_MMU_HPP_
 #define SRC_INCLUDE_MMU_HPP_
 
-#include <iostream>
-#include <cstdint>
-#define ROM_SIZE   0x8000
-#define VRAM_SIZE  0x2000
-#define ERAM_SIZE  0x2000
-#define WRAM_SIZE  0x2000
-#define OAM_SIZE   0x00A0
+#define ROM_SIZE 0x8000
+#define VRAM_SIZE 0x2000
+#define ERAM_SIZE 0x2000
+#define WRAM_SIZE 0x2000
+#define OAM_SIZE 0x00A0
 #define IOMAP_SIZE 0x0080
-#define HRAM_SIZE  0x007F
+#define HRAM_SIZE 0x007F
+
+#include <stdint.h>
 
 class Mmu {
  private:

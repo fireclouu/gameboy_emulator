@@ -16,10 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "include/cpu.hpp"
-#include <stdint.h>
-#include <cstdint>
-#include "include/opcode.hpp"
+#include "../include/cpu.hpp"
 
 Cpu::Cpu()
 {
@@ -211,8 +208,7 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode)
   case op_disabled_09:
   case op_disabled_10:
   case op_disabled_11:
-
-    printf("ACCESSED ILLEGAL OPCODE!\n");
+    // ACCESSED ILLEGAL OPCODE!\n
     cpuRegister.pc++;
     break;
   // SPECIAL
@@ -931,7 +927,7 @@ int Cpu::decode(uint16_t opcodeAddr, uint8_t opcode)
     decodeCb(currentPc + 1, currentOpcode);
     break;
   default:
-    printf("\n0x%02X: Unknown opcode!\n", currentOpcode);
+    // unknown opcode
     *halt = true;
   }
   return 0;
@@ -1399,7 +1395,7 @@ int Cpu::decodeCb(uint16_t opcodeAddr, uint8_t opcode)
     }
     break;
   default:
-    printf("0x%02X: Unknown CB opcode!\n", opcode);
+    // unknown cb opcode
     *halt = true;
   }
   return tick;

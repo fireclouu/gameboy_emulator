@@ -1,10 +1,14 @@
-set(EXEC "gbemu")
-file(GLOB INCLUDES CMAKE_CONFIGURE_DEPENDS "src/include/*.hpp")
-file(GLOB SOURCES CMAKE_CONFIGURE_DEPENDS "src/*.cpp")
+cmake_minimum_required(VERSION 3.0.0)
+project(gbemu_v2 VERSION 0.1.0)
+file(GLOB SOURCES "src/*.cpp")
+file(GLOB INCLUDES "include/*.hpp")
 
-cmake_minimum_required(VERSION 3.10)
+# include(CTest)
+# enable_testing()
 
-project(${EXEC})
+include_directories(include)
+add_executable(gbemu_v2 ${SOURCES})
 
-add_executable(${EXEC} ${SOURCES} ${INCLUDES})
-target_include_directories(${EXEC} PRIVATE ${INCLUDES})
+set(CPACK_PROJECT_NAME ${PROJECT_NAME})
+set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
+include(CPack)

@@ -19,8 +19,9 @@
 #ifndef SRC_INCLUDE_CPU_HPP_
 #define SRC_INCLUDE_CPU_HPP_
 #define TITLE "GB EMULATOR"
-#include <cstdint>
 
+#include <stdint.h>
+#include "opcode.hpp"
 #include "mmu.hpp"
 
 enum opcodeInstruction {

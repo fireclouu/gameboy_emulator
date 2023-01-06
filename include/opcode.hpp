@@ -18,7 +18,6 @@
 #ifndef SRC_INCLUDE_OPCODE_HPP_
 #define SRC_INCLUDE_OPCODE_HPP_
 
-#include <string>
 extern const char *OP_INSTRUCTION[];
 extern const int OP_BYTES[0x100];
 

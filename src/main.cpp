@@ -16,7 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "include/main.hpp"
+#include "../include/main.hpp"
 
 int main(int argc, char **argv)
 {
@@ -24,34 +24,55 @@ int main(int argc, char **argv)
 
   // testpaths
   std::string testpaths[] = {
-      "../testrom/01-special.gb",
-      "../testrom/02-interrupts.gb",
-      "../testrom/03-op sp,hl.gb",
-      "../testrom/04-op r,imm.gb",
-      "../testrom/05-op rp.gb",
-      "../testrom/06-ld r,r.gb",
-      "../testrom/07-jr,jp,call,ret,rst.gb",
-      "../testrom/08-misc instrs.gb",
-      "../testrom/09-op r,r.gb",
-      "../testrom/10-bit ops.gb",
-      "../testrom/11-op a,(hl).gb",
+      "testrom/01-special.gb",
+      "testrom/02-interrupts.gb",
+      "testrom/03-op sp,hl.gb",
+      "testrom/04-op r,imm.gb",
+      "testrom/05-op rp.gb",
+      "testrom/06-ld r,r.gb",
+      "testrom/07-jr,jp,call,ret,rst.gb",
+      "testrom/08-misc instrs.gb",
+      "testrom/09-op r,r.gb",
+      "testrom/10-bit ops.gb",
+      "testrom/11-op a,(hl).gb",
   };
 
-  // init host
-  Host *host = new Host(argc, argv);
-  uint8_t *romData = NULL;
+  // test roms
+  for (int i = 0; i < 11; i++)
+  {
+    Host *host = new Host(argc, argv);
+    uint8_t *romData = NULL;
 
-  if (host->loadFileOnArgument())
-    romData = host->getRomData();
-  else
-    return 1;
+    if (host->loadFile(testpaths[i]))
+      romData = host->getRomData();
+    else
+      break;
 
-  // init modules
-  Cpu *cpu = new Cpu();
-  Mmu *mmu = new Mmu(romData);
+    // init modules
+    Cpu *cpu = new Cpu();
+    Mmu *mmu = new Mmu(romData);
 
-  // init system
-  Gameboy *gameboy = new Gameboy(cpu, mmu);
-  gameboy->start();
+    // init system
+    Gameboy *gameboy = new Gameboy(cpu, mmu);
+    gameboy->start();
+  }
+
+  // // sigle argument defined roms
+  // // init host
+  // Host *host = new Host(argc, argv);
+  // uint8_t *romData = NULL;
+
+  // if (host->loadFileOnArgument())
+  //   romData = host->getRomData();
+  // else
+  //   return 1;
+
+  // // init modules
+  // Cpu *cpu = new Cpu();
+  // Mmu *mmu = new Mmu(romData);
+
+  // // init system
+  // Gameboy *gameboy = new Gameboy(cpu, mmu);
+  // gameboy->start();
   return 0;
 }

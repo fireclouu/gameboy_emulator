@@ -6,14 +6,9 @@ build
 
 # directory
 assets
-src/todos
-target
-.vscode
 CMakeFiles
 
 # binaries
-gbemuv2
-gbemuv2_memtest
 *.gb
 *.exe
 *.bin
