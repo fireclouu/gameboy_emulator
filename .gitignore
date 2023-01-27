@@ -8,10 +8,13 @@ build
 assets
 CMakeFiles
 
-# binaries
+# binaries and cmake builds
 *.gb
 *.exe
 *.bin
+*.cmake
+Makefile
+gbemu_v2
 
 # platform
 *.sln

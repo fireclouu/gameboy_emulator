@@ -18,61 +18,44 @@
 
 #include "../include/main.hpp"
 
-int main(int argc, char **argv)
-{
-  // printf("%s\n", TITLE);
-
-  // testpaths
-  std::string testpaths[] = {
-      "testrom/01-special.gb",
-      "testrom/02-interrupts.gb",
-      "testrom/03-op sp,hl.gb",
-      "testrom/04-op r,imm.gb",
-      "testrom/05-op rp.gb",
-      "testrom/06-ld r,r.gb",
-      "testrom/07-jr,jp,call,ret,rst.gb",
-      "testrom/08-misc instrs.gb",
-      "testrom/09-op r,r.gb",
-      "testrom/10-bit ops.gb",
-      "testrom/11-op a,(hl).gb",
-  };
-
-  // test roms
-  for (int i = 0; i < 11; i++)
-  {
+int main(int argc, char **argv) {
+    std::string testpaths[] = {
+        "testrom/01-special.gb",
+        "testrom/02-interrupts.gb",
+        "testrom/03-op sp,hl.gb",
+        "testrom/04-op r,imm.gb",
+        "testrom/05-op rp.gb",
+        "testrom/06-ld r,r.gb",
+        "testrom/07-jr,jp,call,ret,rst.gb",
+        "testrom/08-misc instrs.gb",
+        "testrom/09-op r,r.gb",
+        "testrom/10-bit ops.gb",
+        "testrom/11-op a,(hl).gb",
+    };
     Host *host = new Host(argc, argv);
     uint8_t *romData = NULL;
-
-    if (host->loadFile(testpaths[i]))
-      romData = host->getRomData();
-    else
-      break;
-
-    // init modules
-    Cpu *cpu = new Cpu();
-    Mmu *mmu = new Mmu(romData);
-
-    // init system
-    Gameboy *gameboy = new Gameboy(cpu, mmu);
-    gameboy->start();
-  }
-
-  // // sigle argument defined roms
-  // // init host
-  // Host *host = new Host(argc, argv);
-  // uint8_t *romData = NULL;
-
-  // if (host->loadFileOnArgument())
-  //   romData = host->getRomData();
-  // else
-  //   return 1;
-
-  // // init modules
-  // Cpu *cpu = new Cpu();
-  // Mmu *mmu = new Mmu(romData);
-
-  // // init system
-  // Gameboy *gameboy = new Gameboy(cpu, mmu);
-  // gameboy->start();
-  return 0;
+    if (host->loadFileOnArgument()) {
+        romData = host->getRomData();
+        // init modules
+        Cpu *cpu = new Cpu();
+        Mmu *mmu = new Mmu(romData);
+        // // init system
+        Gameboy *gameboy = new Gameboy(cpu, mmu);
+        gameboy->start();
+    } else {
+        for (int i = 0; i < 11; i++) {
+            if (host->loadFile(testpaths[i])) {
+                romData = host->getRomData();
+            } else {
+                continue;
+            }
+            // init modules
+            Cpu *cpu = new Cpu();
+            Mmu *mmu = new Mmu(romData);
+            // init system
+            Gameboy *gameboy = new Gameboy(cpu, mmu);
+            gameboy->start();
+        }
+    }
+    return 0;
 }

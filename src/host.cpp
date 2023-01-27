@@ -90,17 +90,17 @@ bool Host::loadFile(const std::string filePath)
 {
   if (filePath.empty())
   {
-    printf("No file defined.");
+    printf("No file defined.\n");
     return false;
   }
   if (!fileExist(filePath))
   {
-    printf("%s: File could not be found", filePath.c_str());
+    printf("%s: File could not be found\n", filePath.c_str());
     return false;
   }
   if (!(fileSize = getFileSize(filePath)))
   {
-    printf("%s: File size is invalid!", filePath.c_str());
+    printf("%s: File size is invalid!\n", filePath.c_str());
     return false;
   }
 

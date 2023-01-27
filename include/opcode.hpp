@@ -20,5 +20,6 @@
 
 extern const char *OP_INSTRUCTION[];
 extern const int OP_BYTES[0x100];
+extern const int OP_CYCLE[0x100];
 
 #endif  // SRC_INCLUDE_OPCODE_HPP_

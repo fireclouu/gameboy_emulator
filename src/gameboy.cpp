@@ -26,8 +26,8 @@ bool isPassed = false;
 std::string buildMessage = "";
 bool isInitialMessageFetched = false;
 // islooping
-uint16_t lastPc = NULL;
-uint8_t lastInstruction = NULL;
+uint16_t lastPc = 0;
+uint8_t lastInstruction = 0;
 
 bool isMessagePassed(char msg)
 {
@@ -138,8 +138,7 @@ void testAutomation(Cpu *cpu, Mmu *mmu, bool *halt)
   }
 }
 
-void Gameboy::start()
-{
+void Gameboy::start() {
   // testvars
   // isMessagePassed
   passedCount = 0;
@@ -148,8 +147,8 @@ void Gameboy::start()
   buildMessage = "";
   isInitialMessageFetched = false;
   // islooping
-  lastPc = NULL;
-  lastInstruction = NULL;
+  lastPc = 0;
+  lastInstruction = 0;
 
   // debugger attach
   Debug *debug = NULL;
@@ -165,26 +164,19 @@ void Gameboy::start()
   cpu->cpuRegister.reg_pair_de = 0xFF56;
   cpu->cpuRegister.reg_pair_hl = 0x000D;
 
-  while (!this->halt)
-  {
-    uint16_t pc;
-    uint8_t opcode;
-
+  while (!this->halt) {
     // debug
-    if (debug != NULL)
+    if (debug != NULL) {
       debug->startDebug();
-    
-    // for testing
+    }
+    // serial automation
     testAutomation(cpu, mmu, &this->halt);
-
-    pc = cpu->cpuRegister.pc;
-    opcode = mmu->readByte(pc);
-    cpu->cpuRegister.pc += OP_BYTES[opcode];
-    // initial timing
-    // lcd 4.194 MHz
-    // 16.74ms / cycle
-    cpu->decode(pc, opcode);
+    // emulation
+    uint16_t pc = cpu->cpuRegister.pc;
+    uint8_t opcode = mmu->readByte(pc);
+    cpu->decode(opcode);
   }
-  if (debug != NULL)
-    debug->endDebug();
+  if (debug != NULL) {
+      debug->endDebug();
+  }
 }

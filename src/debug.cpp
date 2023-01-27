@@ -30,7 +30,7 @@ Debug::Debug(Cpu *cpu, Mmu *mmu) {
 void Debug::print() {
   int pc = cpu->cpuRegister.pc;
   int sp = cpu->cpuRegister.sp;
-  printf("ITER: %llu\n", iterate);
+  printf("ITER: %lu\n", iterate);
   printf(
       "PC: %04X (%02X)  SP: %04X\nAF: %04X  BC: %04X  DE: %04X  HL: %04X  %s\n",
       pc, mmu->readByte(pc), cpu->cpuRegister.sp, cpu->cpuRegister.reg_pair_af,
@@ -48,13 +48,13 @@ void Debug::print() {
 }
 void Debug::endDebug() {
   int usedOpcodes = 0;
-  printf("Program ended with %llu iterations!\n", iterate);
+  printf("Program ended with %lu iterations!\n", iterate);
   printf("All used opcodes:\n");
   printf("Opcodes:\n");
   for (int a = 0; a < 0xFF; a++) {
     uint64_t tmp = opcodeTally[a];
     if (tmp) {
-      printf("%02X: %llu\n", a, tmp);
+      printf("%02X: %lu\n", a, tmp);
       usedOpcodes++;
     }
   }
@@ -65,7 +65,7 @@ void Debug::endDebug() {
   for (int a = 0; a < 0xFF; a++) {
     uint64_t tmp = opcodeTallyCb[a];
     if (tmp) {
-      printf("%02X: %llu\n", a, tmp);
+      printf("%02X: %lu\n", a, tmp);
       usedOpcodes++;
     }
   }
