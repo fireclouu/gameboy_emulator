@@ -174,7 +174,12 @@ void Gameboy::start() {
     // emulation
     uint16_t pc = cpu->cpuRegister.pc;
     uint8_t opcode = mmu->readByte(pc);
-    cpu->decode(opcode);
+    uint8_t tick = cpu->decode(opcode);
+
+    if (tick == 0) {
+        printf("Clock returned 0!\n");
+        break;
+    }
   }
   if (debug != NULL) {
       debug->endDebug();

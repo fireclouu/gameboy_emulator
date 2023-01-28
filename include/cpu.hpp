@@ -337,10 +337,10 @@ class Cpu {
         uint8_t instructionDec(uint8_t regAddrValue);
         uint16_t instructionStackPop();
         void checkFlagH(uint8_t left, uint8_t right, bool isSubtraction);
-        void conditionalJpAdd(uint8_t flag, uint8_t expected, int8_t value);
-        void conditionalJpA16(uint8_t flag, uint8_t expected, uint16_t value);
-        void conditionalRet(uint8_t flag, uint8_t expected);
-        void conditionalCall(uint16_t pc, uint8_t flag, uint8_t expected);
+        bool conditionalJpAdd(uint8_t flag, uint8_t expected, int8_t value);
+        bool conditionalJpA16(uint8_t flag, uint8_t expected, uint16_t value);
+        bool conditionalRet(uint8_t flag, uint8_t expected);
+        bool conditionalCall(uint16_t pc, uint8_t flag, uint8_t expected);
         void initializeRegisters();
         void instructionRet();
         void instructionCall(uint16_t pc);

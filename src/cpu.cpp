@@ -46,27 +46,35 @@ uint16_t Cpu::instructionStackPop() {
 void Cpu::instructionRet() {
     cpuRegister.pc = instructionStackPop();
 }
-void Cpu::conditionalJpAdd(uint8_t flag, uint8_t expected, int8_t value) {
+bool Cpu::conditionalJpAdd(uint8_t flag, uint8_t expected, int8_t value) {
     if (flag == expected) {
         cpuRegister.pc += (value);
+        return true;
     }
+        return false;
 }
-void Cpu::conditionalJpA16(uint8_t flag, uint8_t expected, uint16_t value) {
+bool Cpu::conditionalJpA16(uint8_t flag, uint8_t expected, uint16_t value) {
     if (flag == expected) {
         cpuRegister.pc = value;
+        return true;
     }
+    return false;
 }
-void Cpu::conditionalRet(uint8_t flag, uint8_t expected) {
+bool Cpu::conditionalRet(uint8_t flag, uint8_t expected) {
     if (flag == expected) {
         instructionRet();
+        return true;
     }
+    return false;
 }
-void Cpu::conditionalCall(uint16_t pc, uint8_t flag, uint8_t expected) {
+bool Cpu::conditionalCall(uint16_t pc, uint8_t flag, uint8_t expected) {
     uint16_t nextWord = mmu->readShort(pc + 1);
     if (flag == expected) {
         instructionStackPush(pc + 3);
         cpuRegister.pc = nextWord;
+        return true;
     }
+    return false;
 }
 void Cpu::instructionAnd(uint8_t value) {
     cpuRegister.reg_a &= value;
@@ -402,26 +410,30 @@ uint8_t Cpu::decode(uint8_t opcode) {
         case op_jr_z_r8: {
                              uint8_t bit = ((opcode & 0x08) >> 3);
                              int8_t nextByte = mmu->readByte(currentPc + 1);
-                             conditionalJpAdd(cpuRegister.flag_z, bit, nextByte);
+                             bool result = conditionalJpAdd(cpuRegister.flag_z, bit, nextByte);
+                             tick = result ? 12 : 8;
                          }
                          break;
         case op_jr_nc_r8:
         case op_jr_c_r8: {
                              uint8_t bit = ((opcode & 0x08) >> 3);
                              int8_t nextByte = mmu->readByte(currentPc + 1);
-                             conditionalJpAdd(cpuRegister.flag_c, bit, nextByte);
+                             bool result = conditionalJpAdd(cpuRegister.flag_c, bit, nextByte);
+                             tick = result ? 12 : 8;
                          }
                          break;
         case op_ret_nz:
         case op_ret_z: {
                            uint8_t bit = ((opcode & 0x08) >> 3);
-                           conditionalRet(cpuRegister.flag_z, bit);
+                           bool result = conditionalRet(cpuRegister.flag_z, bit);
+                           tick = result ? 20 : 8;
                        }
                        break;
         case op_ret_nc:
         case op_ret_c: {
                            uint8_t bit = ((opcode & 0x08) >> 3);
-                           conditionalRet(cpuRegister.flag_c, bit);
+                           bool result = conditionalRet(cpuRegister.flag_c, bit);
+                           tick = result ? 20 : 8;
                        }
                        break;
         case op_reti:
@@ -440,14 +452,16 @@ uint8_t Cpu::decode(uint8_t opcode) {
         case op_jp_z_a16: {
                               uint8_t bit = (opcode & 0x08) >> 3;
                               uint16_t nextWord = mmu->readShort(currentPc + 1);
-                              conditionalJpA16(cpuRegister.flag_z, bit, nextWord);
+                              bool result = conditionalJpA16(cpuRegister.flag_z, bit, nextWord);
+                              tick = result ? 16 : 12;
                           }
                           break;
         case op_jp_nc_a16:
         case op_jp_c_a16: {
                               uint8_t bit = (opcode & 0x08) >> 3;
                               uint16_t nextWord = mmu->readShort(currentPc + 1);
-                              conditionalJpA16(cpuRegister.flag_c, bit, nextWord);
+                              bool result = conditionalJpA16(cpuRegister.flag_c, bit, nextWord);
+                              tick = result ? 16 : 12;
                           }
                           break;
         case op_jp_a16: {
@@ -458,14 +472,16 @@ uint8_t Cpu::decode(uint8_t opcode) {
         case op_call_nz_a16:
         case op_call_z_a16: {
                                 uint8_t bit = (opcode & 0x08) >> 3;
-                                conditionalCall(currentPc, cpuRegister.flag_z, bit);
+                                bool result = conditionalCall(currentPc, cpuRegister.flag_z, bit);
+                                tick = result ? 24 : 12;
                             }
                             break;
 
         case op_call_nc_a16:
         case op_call_c_a16: {
                                 uint8_t bit = (opcode & 0x08) >> 3;
-                                conditionalCall(currentPc, cpuRegister.flag_c, bit);
+                                bool result = conditionalCall(currentPc, cpuRegister.flag_c, bit);
+                                tick = result ? 24 : 12;
                             }
                             break;
                             // PUSH rr
@@ -811,7 +827,7 @@ uint8_t Cpu::decode(uint8_t opcode) {
                      cpuRegister.pc++;
                      currentPc++;
                      opcode = mmu->readByte(currentPc);
-                     decodeCb(opcode);
+                     tick += decodeCb(opcode);
                      break;
         default:
                      // unknown opcode
