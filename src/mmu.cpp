@@ -23,7 +23,6 @@ Mmu::Mmu(uint8_t *romData) {
 }
 
 uint8_t Mmu::readByte(uint16_t addr) {
-  currentTCycle += 4;
   uint8_t memoryByte = 0;
   uint16_t addrSection = (addr & 0xF000);
   switch (addrSection) {
@@ -104,7 +103,6 @@ uint8_t Mmu::readByte(uint16_t addr) {
   return memoryByte;
 }
 void Mmu::writeByte(uint16_t addr, uint8_t value) {
-  currentTCycle += 4;
   uint16_t addrSection = (addr & 0xF000);
   switch (addrSection) {
     //  ROM Bank 00 (16kB)
@@ -168,8 +166,14 @@ void Mmu::writeByte(uint16_t addr, uint8_t value) {
           break;
         case 0x0F00:
           if (addr < 0xFF80) {
-            // IO todo
-            iomap[addr & (IOMAP_SIZE - 1)] = value;
+            switch(addr) {
+                // todo: stop execution
+                case 0xFF04:
+                    iomap[addr & (IOMAP_SIZE - 1)] = 0;
+                    break;
+                default:
+                    iomap[addr & (IOMAP_SIZE - 1)] = value;
+            }
           } else {
             uint8_t hramAddr = (addr & 0xFF) - 0x80;
             hram[hramAddr] = value;
@@ -181,10 +185,6 @@ void Mmu::writeByte(uint16_t addr, uint8_t value) {
 }
 uint16_t Mmu::readShort(uint16_t addr) {
   return (readByte(addr + 1) << 8) + readByte(addr);
-}
-
-void Mmu::setCurrentTCycle(uint32_t* currentTCycle) {
-  this->currentTCycle = currentTCycle;
 }
 
 void Mmu::setRom(uint8_t *romData) {
