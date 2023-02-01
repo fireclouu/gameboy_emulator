@@ -17,6 +17,7 @@
  */
 
 #include "../include/mmu.hpp"
+#include <cstdint>
 
 Mmu::Mmu(uint8_t *romData) {
   this->romData = romData;
@@ -183,10 +184,12 @@ void Mmu::writeByte(uint16_t addr, uint8_t value) {
     } break;
   }
 }
+void Mmu::writeDiv(uint8_t value) {
+    iomap[0xFF04 & (IOMAP_SIZE - 1)] = value;
+}
 uint16_t Mmu::readShort(uint16_t addr) {
   return (readByte(addr + 1) << 8) + readByte(addr);
 }
-
 void Mmu::setRom(uint8_t *romData) {
     //std::copy(romData, romData + ROM_SIZE, this->romData);
     this->romData = romData;

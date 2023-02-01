@@ -10,7 +10,7 @@
 </h1>
 
 ### :dart: Overview
-A personal project emulating Gameboy CPU and internals on other systems. :video_game:
+A personal project emulating Gameboy CPU and internals that runs on other systems. :video_game:
 ###### :bulb: Using C/C++ for flexible memory management feature.
 
 ___

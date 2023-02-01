@@ -18,7 +18,6 @@
 
 #include "../include/gameboy.hpp"
 #include <cstdint>
-#include <cstdio>
 
 // isMessagePassed
 const char PASSED[] = {0x50, 0x61, 0x73, 0x73, 0x65, 0x64, 0x0a}; // PASSED\n
@@ -134,9 +133,9 @@ void Gameboy::start() {
     cpu->cpuRegister.reg_c = 0x00;
     cpu->cpuRegister.reg_pair_de = 0xFF56;
     cpu->cpuRegister.reg_pair_hl = 0x000D;
-    uint8_t clk_ff04 = 0;
-    uint8_t old_clk_ff04 = 0;
-    uint8_t ff04_value = 0;
+    uint8_t clk_div = 0;
+    uint8_t old_clk_div = 0;
+    uint8_t div_value = 0;
     uint16_t tac_clk_frq = 0;
     uint16_t tima_clk = 0;
     while (!this->halt) {
@@ -157,17 +156,22 @@ void Gameboy::start() {
             break;
         }
         // 0xff04
-        old_clk_ff04 = clk_ff04;
-        clk_ff04 += tick;
-        if (old_clk_ff04 > clk_ff04) {
-            ff04_value = mmu->readByte(0xFF04);
-            mmu->writeByte(0xFF04, ff04_value + 1);
+        old_clk_div = clk_div;
+        clk_div += tick;
+        if (old_clk_div > clk_div) {
+            div_value = mmu->readByte(0xFF04);
+            mmu->writeDiv(div_value + 1);
+            uint8_t new_div_value = mmu->readByte(0xFF04);
+            if ((div_value == 0) && (new_div_value == 1)) {
+                uint16_t tima_value = mmu->readByte(0xFF05);
+                mmu->writeByte(0xFF05, tima_value + 1);
+            }
         }
         // 0xff07
-        uint8_t ff07_value = mmu->readByte(0xFF07);
-        bool timer_enable = (ff07_value & 0x04) != 0 ? true : false;
-        uint8_t tac_clk_mode = (ff07_value & 0x03);
-        if (timer_enable) {
+        uint8_t tac_value = mmu->readByte(0xFF07);
+        bool tac_timer_enable = (tac_value & 0x04) != 0 ? true : false;
+        uint8_t tac_clk_mode = (tac_value & 0x03);
+        if (tac_timer_enable) {
             switch (tac_clk_mode) {
                 case 0:
                     tac_clk_frq = 1024;

@@ -26,7 +26,6 @@
 #include "opcode.hpp"
 #include "cpu.hpp"
 #include "mmu.hpp"
-#include "gameboy.hpp"
 
 class Debug {
  public:

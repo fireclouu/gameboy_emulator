@@ -46,6 +46,7 @@ class Mmu {
   void writeByte(uint16_t addr, uint8_t value);
   uint8_t readByte(uint16_t addr);
   uint16_t readShort(uint16_t addr);
+  void writeDiv(uint8_t value);
   void setRom(uint8_t romData[ROM_SIZE]);
 };
 
