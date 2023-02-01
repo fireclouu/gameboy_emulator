@@ -17,6 +17,8 @@ ___
 ### Building
 Clone this repository and build using CMake. Use output binary as ```gbemu_v2 -i {path/to/file}```
 
+If no parameters declared, it will automatically runs test. Please create `testrom` folder and place blarggs test. It only supports individual test for now.
+
 Sample output:
 
 <img src="https://github.com/fireclouu/gbemu_v2/raw/7fc68e3c9c3d85031ae942650d81591d739847ce/blob/image_tests.png">
