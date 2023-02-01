@@ -33,11 +33,11 @@ uint8_t lastInstruction = 0;
 Gameboy::Gameboy(Cpu *cpu, Mmu *mmu) {
     halt = false;
     ime = false;
-
     this->cpu = cpu;
     this->mmu = mmu;
     cpu->setMmu(mmu);
     cpu->setHalt(&halt);
+    cpu->setIme(&ime);
 }
 
 bool isMessagePassed(char msg) {

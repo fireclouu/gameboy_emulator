@@ -17,12 +17,18 @@
  */
 
 #include "../include/cpu.hpp"
+#include <cstdint>
+
+// poc
+uint8_t isEiRequested = false;
+uint8_t eiDelayCount = 0;
 
 Cpu::Cpu() {
     this->initializeRegisters();
 }
 void Cpu::setMmu(Mmu *mmu) { this->mmu = mmu; }
 void Cpu::setHalt(bool *halt) { this->halt = halt; }
+void Cpu::setIme(bool *ime) { this->ime = ime; }
 void Cpu::checkFlagH(uint8_t left, uint8_t right, bool isSubtraction) {
     if (isSubtraction) {
         uint8_t result = (left & 0x0F) - (right & 0x0F);
@@ -189,7 +195,16 @@ uint8_t Cpu::decode(uint8_t opcode) {
         case op_stop_0:
         case op_halt:
         case op_di:
+            *ime = false;
+            break;
         case op_ei:
+            // 1 ins. delay
+            isEiRequested = true;
+            if (isEiRequested && eiDelayCount == 1) {
+                *ime = true;
+                isEiRequested = false;
+                eiDelayCount = 0;
+            }
             break;
             // ROTATES AND SHIFTS
         case op_rlca: {
@@ -437,6 +452,7 @@ uint8_t Cpu::decode(uint8_t opcode) {
                        }
                        break;
         case op_reti:
+                       *ime = true;
                        instructionRet();
                        break;
         case op_pop_bc:
@@ -511,6 +527,7 @@ uint8_t Cpu::decode(uint8_t opcode) {
         case op_rst_28h:
         case op_rst_30h:
         case op_rst_38h: {
+                             *ime = false;
                              uint8_t rstAddr = (opcode & 0x38);
                              instructionStackPush(currentPc + 1);
                              cpuRegister.pc = rstAddr;
@@ -1293,6 +1310,13 @@ uint8_t Cpu::decodeCb(uint8_t opcode) {
         default:
                    // unknown cb opcode
                    *halt = true;
+    }
+    if (isEiRequested) {
+        if (eiDelayCount != 1) {
+            eiDelayCount++;
+        } else {
+            decode(op_ei); // do not use return value
+        }
     }
     return tick;
 }

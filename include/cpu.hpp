@@ -331,6 +331,8 @@ class Cpu {
         // datatypes and struct
         // class declaration
         Mmu* mmu;
+        bool* halt;
+        bool* ime;
         // functions
         uint8_t decodeCb(uint8_t opcode);
         uint8_t instructionInc(uint8_t regAddrValue);
@@ -356,10 +358,10 @@ class Cpu {
     public:
         Cpu();
         ~Cpu();
-        bool* halt;
         struct CpuRegister cpuRegister = {};
         void setMmu(Mmu* mmu);
         void setHalt(bool* halt);
+        void setIme(bool* ime);
         void instructionStackPush(uint16_t addr_value);
         uint8_t decode(uint8_t opcode);
 };
