@@ -16,21 +16,21 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../include/main.hpp"
+#include "include/main.hpp"
 
 int main(int argc, char **argv) {
     std::string testpaths[] = {
-        "testrom/01-special.gb",
-        "testrom/02-interrupts.gb",
-        "testrom/03-op sp,hl.gb",
-        "testrom/04-op r,imm.gb",
-        "testrom/05-op rp.gb",
-        "testrom/06-ld r,r.gb",
-        "testrom/07-jr,jp,call,ret,rst.gb",
-        "testrom/08-misc instrs.gb",
-        "testrom/09-op r,r.gb",
-        "testrom/10-bit ops.gb",
-        "testrom/11-op a,(hl).gb",
+        "01-special.gb",
+        "02-interrupts.gb",
+        "03-op sp,hl.gb",
+        "04-op r,imm.gb",
+        "05-op rp.gb",
+        "06-ld r,r.gb",
+        "07-jr,jp,call,ret,rst.gb",
+        "08-misc instrs.gb",
+        "09-op r,r.gb",
+        "10-bit ops.gb",
+        "11-op a,(hl).gb",
     };
     Host *host = new Host(argc, argv);
     uint8_t *romData = NULL;
@@ -43,8 +43,10 @@ int main(int argc, char **argv) {
         Gameboy *gameboy = new Gameboy(cpu, mmu);
         gameboy->start();
     } else {
+      std::string dirPath = "gb-test-roms/cpu_instrs/individual/";
         for (int i = 0; i < 11; i++) {
-            if (host->loadFile(testpaths[i])) {
+          std::string testRomFilePath = dirPath + testpaths[i];
+            if (host->loadFile(testRomFilePath)) {
                 romData = host->getRomData();
             } else {
                 continue;

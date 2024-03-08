@@ -16,8 +16,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../include/mmu.hpp"
 #include <cstdint>
+#include "include/mmu.hpp"
 
 Mmu::Mmu(uint8_t *romData) {
   this->romData = romData;

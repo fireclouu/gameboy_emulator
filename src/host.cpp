@@ -16,7 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../include/host.hpp"
+#include "include/host.hpp"
 
 Host::Host(int argc, char **argv)
 {

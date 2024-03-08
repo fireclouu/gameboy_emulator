@@ -16,8 +16,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../include/gameboy.hpp"
 #include <cstdint>
+#include "include/gameboy.hpp"
 
 // isMessagePassed
 const char PASSED[] = {0x50, 0x61, 0x73, 0x73, 0x65, 0x64, 0x0a}; // PASSED\n

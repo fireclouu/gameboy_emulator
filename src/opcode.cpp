@@ -15,7 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../include/opcode.hpp"
+#include "include/opcode.hpp"
 
 const char *OP_INSTRUCTION[] = {
     "NOP",         "LD BC,d16", "LD (BC),A",      "INC BC",

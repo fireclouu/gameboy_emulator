@@ -16,8 +16,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../include/cpu.hpp"
 #include <cstdint>
+#include "include/cpu.hpp"
 
 // poc
 uint8_t isEiRequested = false;
