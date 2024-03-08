@@ -15,7 +15,15 @@ A personal project emulating Gameboy CPU and internals that runs on other system
 
 ___
 ### Building
-Clone this repository `git clone --recursive https://github.com/fireclouu/gbemu_v2` and build using CMake. Use output binary as ```gbemu_v2 -i {path/to/file}```
+Clone this repository:
+``` bash
+git clone --recursive https://github.com/fireclouu/gbemu_v2
+```
+
+ and build using CMake. Use output binary as :
+ ``` bash
+ gbemu_v2 -i {path/to/file}
+```
 
 If no parameters declared, it will automatically runs test provided by [retrio/gb-test-roms](https://github.com/retrio/gb-test-roms/tree/master). It only supports individual test for now.
 
