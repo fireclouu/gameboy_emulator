@@ -28,16 +28,17 @@ using namespace std;
 class Host
 {
 private:
-  bool fileExist(string filePath);
+  bool fileExist(string);
   int fileSize;
-  int getFileSize(string filePath);
-  void readFileContents(string filePath);
+  int getFileSize(string);
+  void readFileContents(string);
   uint8_t romData[ROM_SIZE];
   string filePath;
 
 public:
-  Host(const string filePath);
-  bool loadFile(string filePath);
+  Host();
+  Host(const string);
+  bool loadFile(string);
   bool loadFileOnArgument();
   uint8_t *getRomData();
 };

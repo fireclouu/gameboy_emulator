@@ -7,7 +7,7 @@ file(GLOB INCLUDES "include/*.hpp")
 # enable_testing()
 
 include_directories(include)
-add_executable(gbemu_v2 ${SOURCES})
+add_executable(gbemu ${SOURCES})
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})

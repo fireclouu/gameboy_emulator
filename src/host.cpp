@@ -18,6 +18,10 @@
 
 #include "include/host.hpp"
 
+Host::Host()
+{
+  fileSize = 0;
+}
 Host::Host(const string filePath)
 {
   this->filePath = filePath;

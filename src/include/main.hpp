@@ -18,7 +18,6 @@
 
 #ifndef SRC_INCLUDE_MAIN_HPP_
 #define SRC_INCLUDE_MAIN_HPP_
-#define TITLE "GB EMULATOR"
 
 #include "cpu.hpp"
 #include "gameboy.hpp"

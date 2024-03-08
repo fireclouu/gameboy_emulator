@@ -18,8 +18,9 @@
 
 #include "include/main.hpp"
 #include "include/host.hpp"
-#include <cstdio>
-#include <cstring>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 void runTest(Host* host, uint8_t* romData) {
   const string dirPathTestsIndividual = "gb-test-roms/cpu_instrs/individual/";
@@ -37,10 +38,10 @@ void runTest(Host* host, uint8_t* romData) {
     "11-op a,(hl).gb",
   };
 
-  host = new Host("");
+  host = new Host();
 
-  for (int i = 0; i < 11; i++) {
-    string testRomFilePath = dirPathTestsIndividual + testpaths[i];
+  for (const auto & entry : fs::directory_iterator(dirPathTestsIndividual)) {
+    string testRomFilePath = entry.path();
     if (!host->loadFile(testRomFilePath)) continue;
     romData = host->getRomData();
 
@@ -60,8 +61,10 @@ int main(int argc, char **argv) {
   uint8_t *romData = NULL;
 
   // user input
+  if (argc == 1) {
+    runTest(host, romData);
+  };
 
-  if (argc == 1) exit(1);
   while ((++argv)[0]) {
     if (argv[0][0] == '-') {
       char option = argv[0][1];
@@ -79,6 +82,7 @@ int main(int argc, char **argv) {
           break;
 
         case 't':
+          runTest(host, romData);
           runTest(host, romData);
           break;
 
