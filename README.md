@@ -9,7 +9,7 @@
   </div>
 </h1>
 
-### :dart: Overview
+### Overview
 A personal project emulating Gameboy CPU and internals that runs on other systems. :video_game:
 ###### :bulb: Using C/C++ for flexible memory management feature.
 
@@ -34,7 +34,3 @@ ___
 
 
 </div>
-
-
-
-> **Note** Please take note that my codebase will be messy, I'm trying my best to refactor and organize things. Cleanups will follow once I have my own personal computer ready!
