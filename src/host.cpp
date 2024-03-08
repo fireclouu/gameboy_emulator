@@ -18,54 +18,26 @@
 
 #include "include/host.hpp"
 
-Host::Host(int argc, char **argv)
+Host::Host(const string filePath)
 {
-  this->argc = argc;
-  this->argv = argv;
+  this->filePath = filePath;
   fileSize = 0;
-  handleUserArgument();
 }
-void Host::handleUserArgument()
-{
-  while ((++argv)[0])
-  {
-    if (argv[0][0] == '-')
-    {
-      switch (argv[0][1])
-      {
-      case 'i':
-        if ((argv[1] == nullptr) || std::string(argv[1]).empty())
-        {
-          printf("error: provide file path\n");
-          exit(1);
-        }
-        else
-        {
-          filePath = argv[1];
-        }
-        break;
-      default:
-        printf("-%c: Unknown option\n", argv[0][1]);
-        exit(1);
-      }
-    }
-  }
-}
-bool Host::fileExist(std::string filePath)
+bool Host::fileExist(string filePath)
 {
   bool value = false;
-  std::ifstream stream(filePath, std::ios::binary | std::ios::in);
+  ifstream stream(filePath, ios::binary | ios::in);
   value = stream.is_open();
   stream.close();
   return value;
 }
-int Host::getFileSize(std::string filePath)
+int Host::getFileSize(string filePath)
 {
   int size = 0;
-  std::ifstream stream(filePath, std::ios::binary | std::ios::in);
+  ifstream stream(filePath, ios::binary | ios::in);
   if (stream.is_open())
   {
-    stream.seekg(0, std::ios::end);
+    stream.seekg(0, ios::end);
     size = stream.tellg();
   }
 
@@ -73,10 +45,10 @@ int Host::getFileSize(std::string filePath)
   return size;
 }
 
-void Host::readFileContents(std::string filePath)
+void Host::readFileContents(string filePath)
 {
-  std::ifstream stream;
-  stream.open(filePath.c_str(), std::ios::binary | std::ios::in);
+  ifstream stream;
+  stream.open(filePath.c_str(), ios::binary | ios::in);
   if (stream.is_open())
   {
     while (stream.good())
@@ -86,7 +58,7 @@ void Host::readFileContents(std::string filePath)
   }
   stream.close();
 }
-bool Host::loadFile(const std::string filePath)
+bool Host::loadFile(const string filePath)
 {
   if (filePath.empty())
   {

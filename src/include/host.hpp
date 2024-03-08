@@ -24,22 +24,20 @@
 #include <iostream>
 #include "gameboy.hpp"
 
+using namespace std;
 class Host
 {
 private:
-  void handleUserArgument();
-  bool fileExist(std::string filePath);
-  char **argv;
+  bool fileExist(string filePath);
   int fileSize;
-  int argc;
-  int getFileSize(std::string filePath);
-  void readFileContents(std::string filePath);
+  int getFileSize(string filePath);
+  void readFileContents(string filePath);
   uint8_t romData[ROM_SIZE];
-  std::string filePath;
+  string filePath;
 
 public:
-  Host(int argc, char **argv);
-  bool loadFile(std::string filePath);
+  Host(const string filePath);
+  bool loadFile(string filePath);
   bool loadFileOnArgument();
   uint8_t *getRomData();
 };

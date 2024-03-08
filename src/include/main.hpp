@@ -25,4 +25,6 @@
 #include "host.hpp"
 #include "mmu.hpp"
 
+using namespace std;
+
 #endif  // SRC_INCLUDE_MAIN_HPP_

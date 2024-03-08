@@ -17,47 +17,90 @@
  */
 
 #include "include/main.hpp"
+#include "include/host.hpp"
+#include <cstdio>
+#include <cstring>
 
+void runTest() {
+  host = new Host();
+  for (int i = 0; i < 11; i++) {
+  }
+}
 int main(int argc, char **argv) {
-    std::string testpaths[] = {
-        "01-special.gb",
-        "02-interrupts.gb",
-        "03-op sp,hl.gb",
-        "04-op r,imm.gb",
-        "05-op rp.gb",
-        "06-ld r,r.gb",
-        "07-jr,jp,call,ret,rst.gb",
-        "08-misc instrs.gb",
-        "09-op r,r.gb",
-        "10-bit ops.gb",
-        "11-op a,(hl).gb",
-    };
-    Host *host = new Host(argc, argv);
-    uint8_t *romData = NULL;
-    if (host->loadFileOnArgument()) {
-        romData = host->getRomData();
-        // init modules
-        Cpu *cpu = new Cpu();
-        Mmu *mmu = new Mmu(romData);
-        // // init system
-        Gameboy *gameboy = new Gameboy(cpu, mmu);
-        gameboy->start();
-    } else {
-      std::string dirPath = "gb-test-roms/cpu_instrs/individual/";
-        for (int i = 0; i < 11; i++) {
-          std::string testRomFilePath = dirPath + testpaths[i];
-            if (host->loadFile(testRomFilePath)) {
-                romData = host->getRomData();
-            } else {
-                continue;
-            }
+  const string dirPathTestsIndividual = "gb-test-roms/cpu_instrs/individual/";
+
+  string testpaths[] = {
+    "01-special.gb",
+    "02-interrupts.gb",
+    "03-op sp,hl.gb",
+    "04-op r,imm.gb",
+    "05-op rp.gb",
+    "06-ld r,r.gb",
+    "07-jr,jp,call,ret,rst.gb",
+    "08-misc instrs.gb",
+    "09-op r,r.gb",
+    "10-bit ops.gb",
+    "11-op a,(hl).gb",
+  };
+
+  Host *host = NULL;
+  uint8_t *romData = NULL;
+
+  // user input
+
+  if (argc == 1) exit(1);
+  while ((++argv)[0]) {
+    if (argv[0][0] == '-') {
+      char option = argv[0][1];
+      string argument = argv[1] != NULL ? argv[1] : "";
+
+      printf("%s", argument.c_str());
+      switch(option) {
+        case 'i':
+          if (argument.empty()) {
+            printf("-%c: No file path provided.\n", option);
+            exit(1);
+          } else {
+            // TODO: pass file path
+            host = new Host(argument);
+          }
+          break;
+
+        case 't':
+          host = new Host("");
+          for (int i = 0; i < 11; i++) {
+            string testRomFilePath = dirPathTestsIndividual + testpaths[i];
+            if (!host->loadFile(testRomFilePath)) continue;
+            romData = host->getRomData();
+
             // init modules
             Cpu *cpu = new Cpu();
             Mmu *mmu = new Mmu(romData);
+
             // init system
             Gameboy *gameboy = new Gameboy(cpu, mmu);
             gameboy->start();
-        }
+          }
+
+          exit(0);
+          break;
+
+        default:
+          printf("-%c: Unknown option.\n", option);
+          exit(1);
+      }
     }
-    return 0;
+  }
+
+  if (host->loadFileOnArgument()) {
+    romData = host->getRomData();
+    // init modules
+    Cpu *cpu = new Cpu();
+    Mmu *mmu = new Mmu(romData);
+    // // init system
+    Gameboy *gameboy = new Gameboy(cpu, mmu);
+    gameboy->start();
+  }
+
+  return 0;
 }
