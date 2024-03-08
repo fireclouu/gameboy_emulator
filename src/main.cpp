@@ -21,15 +21,9 @@
 #include <cstdio>
 #include <cstring>
 
-void runTest() {
-  host = new Host();
-  for (int i = 0; i < 11; i++) {
-  }
-}
-int main(int argc, char **argv) {
+void runTest(Host* host, uint8_t* romData) {
   const string dirPathTestsIndividual = "gb-test-roms/cpu_instrs/individual/";
-
-  string testpaths[] = {
+  const string testpaths[] = {
     "01-special.gb",
     "02-interrupts.gb",
     "03-op sp,hl.gb",
@@ -43,6 +37,25 @@ int main(int argc, char **argv) {
     "11-op a,(hl).gb",
   };
 
+  host = new Host("");
+
+  for (int i = 0; i < 11; i++) {
+    string testRomFilePath = dirPathTestsIndividual + testpaths[i];
+    if (!host->loadFile(testRomFilePath)) continue;
+    romData = host->getRomData();
+
+    // init modules
+    Cpu *cpu = new Cpu();
+    Mmu *mmu = new Mmu(romData);
+
+    // init system
+    Gameboy *gameboy = new Gameboy(cpu, mmu);
+    gameboy->start();
+  }
+
+  exit(0);
+}
+int main(int argc, char **argv) {
   Host *host = NULL;
   uint8_t *romData = NULL;
 
@@ -61,28 +74,12 @@ int main(int argc, char **argv) {
             printf("-%c: No file path provided.\n", option);
             exit(1);
           } else {
-            // TODO: pass file path
             host = new Host(argument);
           }
           break;
 
         case 't':
-          host = new Host("");
-          for (int i = 0; i < 11; i++) {
-            string testRomFilePath = dirPathTestsIndividual + testpaths[i];
-            if (!host->loadFile(testRomFilePath)) continue;
-            romData = host->getRomData();
-
-            // init modules
-            Cpu *cpu = new Cpu();
-            Mmu *mmu = new Mmu(romData);
-
-            // init system
-            Gameboy *gameboy = new Gameboy(cpu, mmu);
-            gameboy->start();
-          }
-
-          exit(0);
+          runTest(host, romData);
           break;
 
         default:
