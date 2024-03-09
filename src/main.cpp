@@ -24,19 +24,6 @@ namespace fs = std::filesystem;
 
 void runTest(Host* host, uint8_t* romData) {
   const string dirPathTestsIndividual = "gb-test-roms/cpu_instrs/individual/";
-  const string testpaths[] = {
-    "01-special.gb",
-    "02-interrupts.gb",
-    "03-op sp,hl.gb",
-    "04-op r,imm.gb",
-    "05-op rp.gb",
-    "06-ld r,r.gb",
-    "07-jr,jp,call,ret,rst.gb",
-    "08-misc instrs.gb",
-    "09-op r,r.gb",
-    "10-bit ops.gb",
-    "11-op a,(hl).gb",
-  };
 
   host = new Host();
 
