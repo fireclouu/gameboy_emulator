@@ -17,7 +17,7 @@ ___
 ### Building
 Clone this repository:
 ``` bash
-git clone --recursive https://github.com/fireclouu/gbemu_v2
+git clone --recursive https://github.com/fireclouu/gb_emu
 ```
 
 and build using CMake. Use output binary as :
