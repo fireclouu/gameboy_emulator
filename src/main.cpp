@@ -57,7 +57,6 @@ int main(int argc, char **argv) {
       char option = argv[0][1];
       string argument = argv[1] != NULL ? argv[1] : "";
 
-      printf("%s", argument.c_str());
       switch(option) {
         case 'i':
           if (argument.empty()) {
