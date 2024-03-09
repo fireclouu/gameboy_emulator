@@ -34,7 +34,7 @@ It only supports individual test for now.
 
 Sample output:
 
-<img src="https://github.com/fireclouu/gbemu_v2/raw/7fc68e3c9c3d85031ae942650d81591d739847ce/blob/image_tests.png">
+![image](https://github.com/fireclouu/gb_emu/assets/22563129/d2a22c59-3461-43ab-9048-f421485b5e23)
 
 ___
 ### :green_book: Status
