@@ -19,16 +19,21 @@
 #include "include/main.hpp"
 #include "include/host.hpp"
 #include <filesystem>
+#include <set>
 
 namespace fs = std::filesystem;
 
-void runTest(Host* host, uint8_t* romData) {
-  const string dirPathTestsIndividual = "gb-test-roms/cpu_instrs/individual/";
-
+void runCpuIndividualTests(Host* host, uint8_t* romData) {
+  const string PATH_DIR_TEST_CPU_INDIVIDUAL = "gb-test-roms/cpu_instrs/individual/";
+  set<fs::path> sortedByName;
   host = new Host();
 
-  for (const auto & entry : fs::directory_iterator(dirPathTestsIndividual)) {
-    string testRomFilePath = entry.path();
+  for (auto & entry : fs::directory_iterator(PATH_DIR_TEST_CPU_INDIVIDUAL)) {
+    sortedByName.insert(entry.path());
+  }
+
+  for (auto & fileName : sortedByName) {
+    string testRomFilePath = fileName;
     if (!host->loadFile(testRomFilePath)) continue;
     romData = host->getRomData();
 
@@ -49,7 +54,8 @@ int main(int argc, char **argv) {
 
   // user input
   if (argc == 1) {
-    runTest(host, romData);
+    runCpuIndividualTests
+  (host, romData);
   };
 
   while ((++argv)[0]) {
@@ -68,8 +74,10 @@ int main(int argc, char **argv) {
           break;
 
         case 't':
-          runTest(host, romData);
-          runTest(host, romData);
+          runCpuIndividualTests
+        (host, romData);
+          runCpuIndividualTests
+        (host, romData);
           break;
 
         default:
