@@ -14,7 +14,7 @@ CMakeFiles
 *.bin
 *.cmake
 Makefile
-gbemu_v2
+gbemu
 
 # platform
 *.sln
