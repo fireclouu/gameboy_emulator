@@ -2,8 +2,8 @@
 <h1>
   <div align="center">
   <p> Gameboy Emulator </p>  
-  <img src="https://img.shields.io/badge/stability-wip-lightgrey.svg">
-  <img src="https://img.shields.io/github/commit-activity/w/fireclouu/gbemu_v2">
+<!--   <img src="https://img.shields.io/badge/stability-wip-lightgrey.svg"> -->
+<!--   <img src="https://img.shields.io/github/commit-activity/w/fireclouu/gbemu_v2"> -->
   <img src="https://img.shields.io/github/repo-size/fireclouu/gbemu_v2">
   <img src="https://img.shields.io/github/last-commit/fireclouu/gbemu_v2">
   </div>
