@@ -17,7 +17,7 @@ ___
 ### Building
 Clone this repository:
 ``` bash
-git clone --recursive https://github.com/fireclouu/gb_emu
+git clone --recursive https://github.com/fireclouu/gameboy_emulator
 ```
 
 and build using CMake. Use output binary as :
